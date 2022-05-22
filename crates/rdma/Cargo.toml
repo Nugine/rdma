@@ -4,3 +4,4 @@ version = "0.1.0-dev"
 edition = "2021"
 
 [dependencies]
+rdma-sys = { path = "../rdma-sys" }
