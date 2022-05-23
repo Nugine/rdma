@@ -21,3 +21,6 @@ sync-version:
         cargo set-version $vers
         popd > /dev/null
     done
+
+install:
+    cargo install --path crates/rdma-tool
