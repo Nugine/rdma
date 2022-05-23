@@ -26,3 +26,6 @@ pub use self::device::{Device, DeviceList, Guid};
 
 mod context;
 pub use self::context::Context;
+
+mod pd;
+pub use self::pd::ProtectionDomain;

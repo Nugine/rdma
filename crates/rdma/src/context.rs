@@ -1,5 +1,6 @@
 use crate::error::custom_error;
 use crate::Device;
+use crate::ProtectionDomain;
 
 use std::io;
 use std::ptr::NonNull;
@@ -35,6 +36,11 @@ impl Context {
     pub(crate) fn strong_ref(&self) -> ContextRef {
         let inner = Asc::clone(&self.inner);
         ContextRef(inner)
+    }
+
+    #[inline]
+    pub fn alloc_pd(&self) -> io::Result<ProtectionDomain> {
+        ProtectionDomain::alloc(self)
     }
 }
 
