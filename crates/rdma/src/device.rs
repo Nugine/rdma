@@ -13,7 +13,7 @@ use numeric_cast::NumericCast;
 use scopeguard::guard_on_unwind;
 
 pub struct DeviceList {
-    arr: NonNull<NonNull<ibv_device>>,
+    arr: NonNull<Device>,
     len: usize,
 }
 
@@ -35,6 +35,10 @@ unsafe impl Sync for Device {}
 pub struct Guid(__be64);
 
 impl DeviceList {
+    fn ffi_ptr(&self) -> *mut *mut ibv_device {
+        self.arr.as_ptr().cast()
+    }
+
     #[inline]
     pub fn available() -> Result<Self> {
         // SAFETY: ffi
@@ -44,7 +48,9 @@ impl DeviceList {
             if arr.is_null() {
                 return Err(Error::last());
             }
-            let arr: NonNull<NonNull<ibv_device>> = NonNull::new_unchecked(arr.cast());
+
+            // SAFETY: repr(transparent)
+            let arr: NonNull<Device> = NonNull::new_unchecked(arr.cast());
 
             let _guard = guard_on_unwind((), |()| ibv_free_device_list(arr.as_ptr().cast()));
 
@@ -63,7 +69,7 @@ impl DeviceList {
     #[must_use]
     pub fn as_slice(&self) -> &[Device] {
         // SAFETY: guaranteed by `DeviceList::available`
-        unsafe { slice::from_raw_parts(self.arr.as_ptr().cast(), self.len) }
+        unsafe { slice::from_raw_parts(self.arr.as_ptr(), self.len) }
     }
 }
 
@@ -71,7 +77,7 @@ impl Drop for DeviceList {
     #[inline]
     fn drop(&mut self) {
         // SAFETY: ffi
-        unsafe { ibv_free_device_list(self.arr.as_ptr().cast()) }
+        unsafe { ibv_free_device_list(self.ffi_ptr()) }
     }
 }
 
@@ -85,11 +91,15 @@ impl Deref for DeviceList {
 }
 
 impl Device {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_device {
+        self.0.as_ptr()
+    }
+
     #[inline]
     #[must_use]
     pub fn c_name(&self) -> &CStr {
         // SAFETY: ffi
-        unsafe { CStr::from_ptr(ibv_get_device_name(self.0.as_ptr())) }
+        unsafe { CStr::from_ptr(ibv_get_device_name(self.ffi_ptr())) }
     }
 
     #[inline]
@@ -102,7 +112,7 @@ impl Device {
     #[must_use]
     pub fn guid(&self) -> Guid {
         // SAFETY: ffi
-        unsafe { Guid(ibv_get_device_guid(self.0.as_ptr())) }
+        unsafe { Guid(ibv_get_device_guid(self.ffi_ptr())) }
     }
 }
 
@@ -122,33 +132,30 @@ impl fmt::Debug for Guid {
     }
 }
 
+fn be64_to_hex<R>(src: __be64, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -> R) -> R {
+    // SAFETY: same repr
+    let src: &[u8; 8] = unsafe { mem::transmute(&src) };
+    let mut buf: MaybeUninit<[u8; 16]> = MaybeUninit::uninit();
+    let ans = {
+        // SAFETY: uninit project
+        let bytes = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), 16) };
+        let dst = hex_simd::OutBuf::from_uninit_mut(bytes);
+        hex_simd::encode_as_str(src, dst, case).unwrap()
+    };
+    f(ans)
+}
+
 impl fmt::LowerHex for Guid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let src = self.as_bytes();
-        let mut buf: MaybeUninit<[u8; 16]> = MaybeUninit::uninit();
-        let ans = {
-            // SAFETY: uninit project
-            let bytes = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), 16) };
-            let dst = hex_simd::OutBuf::from_uninit_mut(bytes);
-            hex_simd::encode_as_str(src, dst, hex_simd::AsciiCase::Lower).unwrap()
-        };
-        f.write_str(ans)
+        be64_to_hex(self.0, hex_simd::AsciiCase::Lower, |s| f.write_str(s))
     }
 }
 
 impl fmt::UpperHex for Guid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let src = self.as_bytes();
-        let mut buf: MaybeUninit<[u8; 16]> = MaybeUninit::uninit();
-        let ans = {
-            // SAFETY: uninit project
-            let bytes = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), 16) };
-            let dst = hex_simd::OutBuf::from_uninit_mut(bytes);
-            hex_simd::encode_as_str(src, dst, hex_simd::AsciiCase::Upper).unwrap()
-        };
-        f.write_str(ans)
+        be64_to_hex(self.0, hex_simd::AsciiCase::Upper, |s| f.write_str(s))
     }
 }
 
