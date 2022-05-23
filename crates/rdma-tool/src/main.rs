@@ -1,5 +1,6 @@
 #![deny(clippy::all)]
 
+mod auto_test;
 mod devices;
 mod rcpp;
 
@@ -11,6 +12,7 @@ use clap::StructOpt;
 enum Opt {
     Devices,
     Rcpp(rcpp::Args),
+    AutoTest,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -22,6 +24,7 @@ fn main() -> anyhow::Result<()> {
     match opt {
         Opt::Devices => devices::run()?,
         Opt::Rcpp(args) => rcpp::run(args)?,
+        Opt::AutoTest => auto_test::run()?,
     }
 
     Ok(())

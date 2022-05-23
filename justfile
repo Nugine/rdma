@@ -23,4 +23,4 @@ sync-version:
     done
 
 install:
-    cargo install --path crates/rdma-tool
+    cargo install --offline --path crates/rdma-tool
