@@ -17,3 +17,6 @@
     clippy::missing_docs_in_private_items, // TODO
     clippy::missing_panics_doc, // TODO
 )]
+
+mod error;
+pub use self::error::{Error, Result};
