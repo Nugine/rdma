@@ -170,6 +170,8 @@ impl fmt::UpperHex for Guid {
 mod tests {
     use super::*;
 
+    use crate::utils::require_send_sync;
+
     #[test]
     fn guid_fmt() {
         let guid = Guid(u64::from_ne_bytes([
@@ -182,5 +184,12 @@ mod tests {
         assert_eq!(debug, "Guid(26418cfffe021df9)");
         assert_eq!(lower_hex, "26418cfffe021df9");
         assert_eq!(upper_hex, "26418CFFFE021DF9");
+    }
+
+    #[test]
+    fn marker() {
+        require_send_sync::<Device>();
+        require_send_sync::<DeviceList>();
+        require_send_sync::<Guid>();
     }
 }

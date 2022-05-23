@@ -71,3 +71,17 @@ impl Drop for Inner {
         assert_eq!(ret, 0);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::utils::require_send_sync;
+
+    #[test]
+    fn marker() {
+        require_send_sync::<ProtectionDomain>();
+        require_send_sync::<ProtectionDomainRef>();
+        require_send_sync::<Inner>();
+    }
+}
