@@ -1,8 +1,9 @@
 use std::fmt;
+use std::io;
 
 pub struct Error(i32);
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 macro_rules! declare_messages {
     {$($no:ident => $msg: literal,)+} => {
@@ -44,6 +45,10 @@ fn lookup_message(errno: i32) -> &'static str {
 }
 
 impl Error {
+    pub(crate) const fn unknown() -> Self {
+        Self(i32::MAX)
+    }
+
     pub(crate) fn new(errno: i32) -> Self {
         Self(errno)
     }
@@ -56,8 +61,8 @@ impl Error {
 
     #[inline]
     #[must_use]
-    pub fn errno(&self) -> i32 {
-        self.0
+    pub fn errno(&self) -> Option<i32> {
+        (self.0 != i32::MAX).then(|| self.0)
     }
 }
 
@@ -77,10 +82,13 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<Error> for std::io::Error {
+impl From<Error> for io::Error {
     #[inline]
     fn from(err: Error) -> Self {
-        std::io::Error::from_raw_os_error(err.errno())
+        match err.errno() {
+            Some(errno) => io::Error::from_raw_os_error(errno),
+            None => io::Error::new(io::ErrorKind::Other, "Unknown error"),
+        }
     }
 }
 
