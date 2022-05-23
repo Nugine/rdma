@@ -1,4 +1,7 @@
+#![deny(clippy::all)]
+
 mod devices;
+mod rcpp;
 
 use std::env;
 
@@ -7,6 +10,7 @@ use clap::StructOpt;
 #[derive(clap::Parser)]
 enum Opt {
     Devices,
+    Rcpp(rcpp::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -17,6 +21,7 @@ fn main() -> anyhow::Result<()> {
     let opt = Opt::parse();
     match opt {
         Opt::Devices => devices::run()?,
+        Opt::Rcpp(args) => rcpp::run(args)?,
     }
 
     Ok(())
