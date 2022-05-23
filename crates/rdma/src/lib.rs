@@ -20,7 +20,6 @@
 )]
 
 mod error;
-pub use self::error::{Error, Result};
 
 mod device;
 pub use self::device::{Device, DeviceList, Guid};

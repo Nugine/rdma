@@ -1,6 +1,8 @@
-use crate::{Context, Error, Result};
+use crate::Context;
+use crate::error::last_errno;
 
 use std::ffi::CStr;
+use std::io;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::raw::c_int;
@@ -40,13 +42,13 @@ impl DeviceList {
     }
 
     #[inline]
-    pub fn available() -> Result<Self> {
+    pub fn available() -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
             let mut num_devices: c_int = 0;
             let arr = ibv_get_device_list(&mut num_devices);
             if arr.is_null() {
-                return Err(Error::last());
+                return Err(last_errno());
             }
 
             // SAFETY: repr(transparent)
@@ -116,7 +118,7 @@ impl Device {
     }
 
     #[inline]
-    pub fn open(&self) -> Result<Context> {
+    pub fn open(&self) -> io::Result<Context> {
         Context::open(self)
     }
 }
