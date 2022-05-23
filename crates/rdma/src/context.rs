@@ -8,6 +8,36 @@ use rdma_sys::*;
 
 use asc::Asc;
 
+pub struct Context {
+    inner: Asc<Inner>,
+    ctx: NonNull<ibv_context>,
+}
+
+/// SAFETY: shared owned type
+unsafe impl Send for Context {}
+/// SAFETY: shared owned type
+unsafe impl Sync for Context {}
+
+pub(crate) struct ContextRef(Asc<Inner>);
+
+impl Context {
+    #[inline]
+    pub fn open(device: &Device) -> io::Result<Self> {
+        let inner = Asc::new(Inner::open(device)?);
+        let ctx = inner.ctx;
+        Ok(Self { inner, ctx })
+    }
+
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_context {
+        self.ctx.as_ptr()
+    }
+
+    pub(crate) fn strong_ref(&self) -> ContextRef {
+        let inner = Asc::clone(&self.inner);
+        ContextRef(inner)
+    }
+}
+
 struct Inner {
     ctx: NonNull<ibv_context>,
 }
@@ -36,15 +66,5 @@ impl Drop for Inner {
         // SAFETY: ffi
         let ret = unsafe { ibv_close_device(self.ctx.as_ptr()) };
         assert_eq!(ret, 0);
-    }
-}
-
-pub struct Context(Asc<Inner>);
-
-impl Context {
-    #[inline]
-    pub fn open(device: &Device) -> io::Result<Self> {
-        let inner = Inner::open(device)?;
-        Ok(Self(Asc::new(inner)))
     }
 }
