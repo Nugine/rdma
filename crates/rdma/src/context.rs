@@ -6,18 +6,19 @@ use std::ptr::NonNull;
 
 use rdma_sys::*;
 
-pub struct Context {
+use asc::Asc;
+
+struct Inner {
     ctx: NonNull<ibv_context>,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Context {}
+unsafe impl Send for Inner {}
 /// SAFETY: owned type
-unsafe impl Sync for Context {}
+unsafe impl Sync for Inner {}
 
-impl Context {
-    #[inline]
-    pub fn open(device: &Device) -> io::Result<Self> {
+impl Inner {
+    fn open(device: &Device) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
             let ctx = ibv_open_device(device.ffi_ptr());
@@ -30,11 +31,20 @@ impl Context {
     }
 }
 
-impl Drop for Context {
-    #[inline]
+impl Drop for Inner {
     fn drop(&mut self) {
         // SAFETY: ffi
         let ret = unsafe { ibv_close_device(self.ctx.as_ptr()) };
         assert_eq!(ret, 0);
+    }
+}
+
+pub struct Context(Asc<Inner>);
+
+impl Context {
+    #[inline]
+    pub fn open(device: &Device) -> io::Result<Self> {
+        let inner = Inner::open(device)?;
+        Ok(Self(Asc::new(inner)))
     }
 }

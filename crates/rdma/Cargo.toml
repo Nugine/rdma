@@ -4,6 +4,7 @@ version = "0.1.0-dev"
 edition = "2021"
 
 [dependencies]
+asc = "0.1.0"
 hex-simd = "0.5.0"
 libc = "0.2.126"
 numeric_cast = "0.1.2"

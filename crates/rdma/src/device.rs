@@ -1,5 +1,5 @@
-use crate::Context;
 use crate::error::last_errno;
+use crate::Context;
 
 use std::ffi::CStr;
 use std::io;
