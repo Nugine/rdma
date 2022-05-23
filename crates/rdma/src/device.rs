@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use crate::{Context, Error, Result};
 
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -113,6 +113,11 @@ impl Device {
     pub fn guid(&self) -> Guid {
         // SAFETY: ffi
         unsafe { Guid(ibv_get_device_guid(self.ffi_ptr())) }
+    }
+
+    #[inline]
+    pub fn open(&self) -> Result<Context> {
+        Context::open(self)
     }
 }
 

@@ -10,7 +10,8 @@
     clippy::wildcard_imports,
     clippy::unwrap_in_result,
     clippy::transmute_ptr_to_ptr,
-    clippy::shadow_reuse
+    clippy::shadow_reuse,
+    clippy::default_numeric_fallback
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
@@ -23,3 +24,6 @@ pub use self::error::{Error, Result};
 
 mod device;
 pub use self::device::{Device, DeviceList, Guid};
+
+mod context;
+pub use self::context::Context;
