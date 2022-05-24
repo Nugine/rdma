@@ -13,17 +13,17 @@ pub fn run() -> anyhow::Result<()> {
         println!("device name: {}", name);
         println!("device guid: {:x}", dev.guid());
 
-        println!("open device");
         let ctx = dev.open()?;
 
-        println!("allocate protection domain");
-        let pd = ctx.alloc_pd()?;
+        let _pd = ctx.alloc_pd()?;
 
-        println!("deallocate protection domain");
-        drop(pd);
+        let cc = ctx.create_cc()?;
 
-        println!("close device");
-        drop(ctx);
+        let _cq1 = ctx.create_cq(8, 1)?;
+
+        let _cq2 = ctx.create_cq_with_cc(8, 2, &cc)?;
+
+        let _cq3 = ctx.create_cq_with_cc(8, 3, &cc)?;
 
         println!()
     }
