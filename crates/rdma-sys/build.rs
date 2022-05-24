@@ -36,38 +36,45 @@ fn main() {
         }
     }
 
-    let bindings = bindgen::Builder::default()
-        .header("/usr/include/infiniband/verbs.h")
-        .header("/usr/include/rdma/rdma_cma.h")
-        .header("/usr/include/rdma/rdma_verbs.h")
-        .allowlist_function("ibv.+")
-        .allowlist_type("ibv.+")
-        .allowlist_function("rdma.+")
-        .allowlist_type("rdma.+")
-        .blocklist_type("pthread.+")
-        .blocklist_type("__pthread.+")
-        .blocklist_type("timespec")
-        .blocklist_type("socklen_t")
-        // .blocklist_type("in_addr")
-        // .blocklist_type("in_addr_t")
-        // .blocklist_type("in_port_t")
-        // .blocklist_type("in6_addr.*")
-        // .blocklist_type("sa_family_t")
-        // .blocklist_type("sockaddr.*")
-        // .blocklist_type("__u.+")
-        .prepend_enum_name(false)
-        .default_enum_style("consts".parse().unwrap())
-        .bitfield_enum("ibv_.+_flags")
-        .bitfield_enum("ibv_.+_mask")
-        .size_t_is_usize(true)
-        .rustfmt_bindings(true)
-        .rust_target("1.47".parse().unwrap())
-        .generate()
-        .expect("Unable to generate bindings");
-
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    bindings
-        .write_to_file(out_dir.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
+    {
+        let bindings = bindgen::Builder::default()
+            .header("/usr/include/infiniband/verbs.h")
+            .header("/usr/include/rdma/rdma_cma.h")
+            .header("/usr/include/rdma/rdma_verbs.h")
+            .allowlist_function("ibv.+")
+            .allowlist_type("ibv.+")
+            .allowlist_function("rdma.+")
+            .allowlist_type("rdma.+")
+            .blocklist_type("pthread.+")
+            .blocklist_type("__pthread.+")
+            .blocklist_type("timespec")
+            .blocklist_type("socklen_t")
+            .prepend_enum_name(false)
+            .default_enum_style("consts".parse().unwrap())
+            .bitfield_enum("ibv_.+_flags")
+            .bitfield_enum("ibv_.+_mask")
+            .size_t_is_usize(true)
+            .rustfmt_bindings(true)
+            .rust_target("1.47".parse().unwrap())
+            .generate()
+            .expect("Unable to generate bindings");
+
+        bindings
+            .write_to_file(out_dir.join("bindings.rs"))
+            .expect("Couldn't write bindings!");
+    }
+
+    {
+        let file = "src/rsrdma.c";
+        let lib = "rsrdma";
+
+        cc::Build::new()
+            .file(file)
+            .include("/usr/include")
+            .compile(lib);
+
+        println!("cargo:rustc-link-lib=static={}", lib);
+    }
 }
