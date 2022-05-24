@@ -40,7 +40,7 @@ impl ProtectionDomain {
 }
 
 struct Inner {
-    ctx_ref: ContextRef,
+    _ctx_ref: ContextRef,
     pd: NonNull<ibv_pd>,
 }
 
@@ -57,9 +57,11 @@ impl Inner {
             if pd.is_null() {
                 return Err(custom_error("failed to allocate protection domain"));
             }
-            let ctx_ref = ctx.strong_ref();
             let pd = NonNull::new_unchecked(pd);
-            Ok(Self { ctx_ref, pd })
+            Ok(Self {
+                _ctx_ref: ctx.strong_ref(),
+                pd,
+            })
         }
     }
 }
