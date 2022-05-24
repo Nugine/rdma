@@ -1,5 +1,7 @@
-use crate::context::ContextRef;
+use crate::context::ContextOwner;
 use crate::error::custom_error;
+use crate::resource::Resource;
+use crate::resource::ResourceOwner;
 use crate::Context;
 
 use std::io;
@@ -9,54 +11,53 @@ use rdma_sys::*;
 
 use asc::Asc;
 
-pub struct CompChannel {
-    inner: Asc<Inner>,
-    cc: NonNull<ibv_comp_channel>,
-}
-
-/// SAFETY: shared owned type
-unsafe impl Send for CompChannel {}
-/// SAFETY: shared owned type
-unsafe impl Sync for CompChannel {}
-
-pub struct CompChannelRef(Asc<Inner>);
+pub struct CompChannel(pub(crate) Resource<CompChannelOwner>);
 
 impl CompChannel {
+    #[inline]
     pub fn create(ctx: &Context) -> io::Result<Self> {
-        let inner = Asc::new(Inner::create(ctx)?);
-        let cc = inner.cc;
-        Ok(Self { inner, cc })
+        let owner = CompChannelOwner::create(ctx)?;
+        Ok(Self(Resource::new(owner)))
     }
 }
 
-struct Inner {
-    _ctx_ref: ContextRef,
+pub(crate) struct CompChannelOwner {
+    _ctx: Asc<ContextOwner>,
     cc: NonNull<ibv_comp_channel>,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for CompChannelOwner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for CompChannelOwner {}
 
-impl Inner {
+/// SAFETY: resource owner
+unsafe impl ResourceOwner for CompChannelOwner {
+    type Ctype = ibv_comp_channel;
+
+    fn ctype(&self) -> *mut Self::Ctype {
+        self.cc.as_ptr()
+    }
+}
+
+impl CompChannelOwner {
     fn create(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let cc = ibv_create_comp_channel(ctx.ffi_ptr());
+            let cc = ibv_create_comp_channel(ctx.0.ffi_ptr());
             if cc.is_null() {
                 return Err(custom_error("failed to create completion channel"));
             }
             let cc = NonNull::new_unchecked(cc);
             Ok(Self {
-                _ctx_ref: ctx.strong_ref(),
+                _ctx: ctx.0.strong_ref(),
                 cc,
             })
         }
     }
 }
 
-impl Drop for Inner {
+impl Drop for CompChannelOwner {
     fn drop(&mut self) {
         // SAFETY: ffi
         let ret = unsafe { ibv_destroy_comp_channel(self.cc.as_ptr()) };
@@ -73,7 +74,6 @@ mod tests {
     #[test]
     fn marker() {
         require_send_sync::<CompChannel>();
-        require_send_sync::<CompChannelRef>();
-        require_send_sync::<Inner>();
+        require_send_sync::<CompChannelOwner>();
     }
 }

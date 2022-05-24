@@ -1,4 +1,7 @@
 use crate::error::custom_error;
+use crate::resource::Resource;
+use crate::resource::ResourceOwner;
+use crate::CompChannel;
 use crate::Device;
 use crate::ProtectionDomain;
 
@@ -7,53 +10,45 @@ use std::ptr::NonNull;
 
 use rdma_sys::*;
 
-use asc::Asc;
-
-pub struct Context {
-    inner: Asc<Inner>,
-    ctx: NonNull<ibv_context>,
-}
-
-/// SAFETY: shared owned type
-unsafe impl Send for Context {}
-/// SAFETY: shared owned type
-unsafe impl Sync for Context {}
-
-pub(crate) struct ContextRef(Asc<Inner>);
+pub struct Context(pub(crate) Resource<ContextOwner>);
 
 impl Context {
     #[inline]
     pub fn open(device: &Device) -> io::Result<Self> {
-        let inner = Asc::new(Inner::open(device)?);
-        let ctx = inner.ctx;
-        Ok(Self { inner, ctx })
-    }
-
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_context {
-        self.ctx.as_ptr()
-    }
-
-    pub(crate) fn strong_ref(&self) -> ContextRef {
-        let inner = Asc::clone(&self.inner);
-        ContextRef(inner)
+        let owner = ContextOwner::open(device)?;
+        Ok(Self(Resource::new(owner)))
     }
 
     #[inline]
     pub fn alloc_pd(&self) -> io::Result<ProtectionDomain> {
         ProtectionDomain::alloc(self)
     }
+
+    #[inline]
+    pub fn create_cc(&self) -> io::Result<CompChannel> {
+        CompChannel::create(self)
+    }
 }
 
-struct Inner {
+pub(crate) struct ContextOwner {
     ctx: NonNull<ibv_context>,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for ContextOwner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for ContextOwner {}
 
-impl Inner {
+/// SAFETY: resource owner
+unsafe impl ResourceOwner for ContextOwner {
+    type Ctype = ibv_context;
+
+    fn ctype(&self) -> *mut Self::Ctype {
+        self.ctx.as_ptr()
+    }
+}
+
+impl ContextOwner {
     fn open(device: &Device) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -67,7 +62,7 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
+impl Drop for ContextOwner {
     fn drop(&mut self) {
         // SAFETY: ffi
         let ret = unsafe { ibv_close_device(self.ctx.as_ptr()) };
@@ -84,7 +79,6 @@ mod tests {
     #[test]
     fn marker() {
         require_send_sync::<Context>();
-        require_send_sync::<ContextRef>();
-        require_send_sync::<Inner>();
+        require_send_sync::<ContextOwner>();
     }
 }

@@ -24,6 +24,8 @@ mod error;
 mod device;
 pub use self::device::{Device, DeviceList, Guid};
 
+mod resource;
+
 mod context;
 pub use self::context::Context;
 
@@ -31,5 +33,6 @@ mod pd;
 pub use self::pd::ProtectionDomain;
 
 mod comp_channel;
+pub use self::comp_channel::CompChannel;
 
 mod utils;

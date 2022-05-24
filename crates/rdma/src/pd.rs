@@ -1,5 +1,7 @@
-use crate::context::ContextRef;
+use crate::context::ContextOwner;
 use crate::error::custom_error;
+use crate::resource::Resource;
+use crate::resource::ResourceOwner;
 use crate::Context;
 
 use std::io;
@@ -9,64 +11,53 @@ use rdma_sys::*;
 
 use asc::Asc;
 
-pub struct ProtectionDomain {
-    inner: Asc<Inner>,
-    pd: NonNull<ibv_pd>,
-}
-
-/// SAFETY: shared owned type
-unsafe impl Send for ProtectionDomain {}
-/// SAFETY: shared owned type
-unsafe impl Sync for ProtectionDomain {}
-
-pub(crate) struct ProtectionDomainRef(Asc<Inner>);
+pub struct ProtectionDomain(pub(crate) Resource<ProtectionDomainOwner>);
 
 impl ProtectionDomain {
     #[inline]
     pub fn alloc(ctx: &Context) -> io::Result<Self> {
-        let inner = Asc::new(Inner::alloc(ctx)?);
-        let pd = inner.pd;
-        Ok(Self { inner, pd })
-    }
-
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_pd {
-        self.pd.as_ptr()
-    }
-
-    pub(crate) fn strong_ref(&self) -> ProtectionDomainRef {
-        let inner = Asc::clone(&self.inner);
-        ProtectionDomainRef(inner)
+        let owner = ProtectionDomainOwner::alloc(ctx)?;
+        Ok(Self(Resource::new(owner)))
     }
 }
 
-struct Inner {
-    _ctx_ref: ContextRef,
+pub(crate) struct ProtectionDomainOwner {
+    _ctx: Asc<ContextOwner>,
     pd: NonNull<ibv_pd>,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for ProtectionDomainOwner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for ProtectionDomainOwner {}
 
-impl Inner {
+/// SAFETY: resource owner
+unsafe impl ResourceOwner for ProtectionDomainOwner {
+    type Ctype = ibv_pd;
+
+    fn ctype(&self) -> *mut Self::Ctype {
+        self.pd.as_ptr()
+    }
+}
+
+impl ProtectionDomainOwner {
     fn alloc(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let pd = ibv_alloc_pd(ctx.ffi_ptr());
+            let pd = ibv_alloc_pd(ctx.0.ffi_ptr());
             if pd.is_null() {
                 return Err(custom_error("failed to allocate protection domain"));
             }
             let pd = NonNull::new_unchecked(pd);
             Ok(Self {
-                _ctx_ref: ctx.strong_ref(),
+                _ctx: ctx.0.strong_ref(),
                 pd,
             })
         }
     }
 }
 
-impl Drop for Inner {
+impl Drop for ProtectionDomainOwner {
     fn drop(&mut self) {
         // SAFETY: ffi
         let ret = unsafe { ibv_dealloc_pd(self.pd.as_ptr()) };
@@ -83,7 +74,6 @@ mod tests {
     #[test]
     fn marker() {
         require_send_sync::<ProtectionDomain>();
-        require_send_sync::<ProtectionDomainRef>();
-        require_send_sync::<Inner>();
+        require_send_sync::<ProtectionDomainOwner>();
     }
 }
