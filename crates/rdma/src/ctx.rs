@@ -1,5 +1,6 @@
 use crate::error::custom_error;
 use crate::query::DeviceAttr;
+use crate::query::PortAttr;
 use crate::resource::Resource;
 use crate::resource::ResourceOwner;
 use crate::CompChannel;
@@ -51,6 +52,11 @@ impl Context {
     #[inline]
     pub fn query_device(&self) -> io::Result<DeviceAttr> {
         DeviceAttr::query(self)
+    }
+
+    #[inline]
+    pub fn query_port(&self, port_num: u32) -> io::Result<PortAttr> {
+        PortAttr::query(self, port_num)
     }
 }
 
