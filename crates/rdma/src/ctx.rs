@@ -1,4 +1,5 @@
 use crate::error::custom_error;
+use crate::query::DeviceAttr;
 use crate::resource::Resource;
 use crate::resource::ResourceOwner;
 use crate::CompChannel;
@@ -44,6 +45,11 @@ impl Context {
         cc: &CompChannel,
     ) -> io::Result<CompletionQueue> {
         CompletionQueue::create_with_cc(self, cqe, user_data, cc)
+    }
+
+    #[inline]
+    pub fn query_device(&self) -> io::Result<DeviceAttr> {
+        DeviceAttr::query(self)
     }
 }
 

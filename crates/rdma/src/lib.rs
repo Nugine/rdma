@@ -21,11 +21,11 @@
 )]
 
 mod error;
+mod resource;
+mod utils;
 
 mod device;
 pub use self::device::{Device, DeviceList, Guid};
-
-mod resource;
 
 mod ctx;
 pub use self::ctx::Context;
@@ -39,4 +39,5 @@ pub use self::cc::CompChannel;
 mod cq;
 pub use self::cq::CompletionQueue;
 
-mod utils;
+mod query;
+pub use self::query::DeviceAttr;
