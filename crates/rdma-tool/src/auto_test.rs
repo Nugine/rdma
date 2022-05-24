@@ -16,6 +16,12 @@ pub fn run() -> anyhow::Result<()> {
         println!("open device");
         let ctx = dev.open()?;
 
+        println!("allocate protection domain");
+        let pd = ctx.alloc_pd()?;
+
+        println!("deallocate protection domain");
+        drop(pd);
+
         println!("close device");
         drop(ctx);
 
