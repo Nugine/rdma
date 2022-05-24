@@ -1,3 +1,9 @@
+use rdma::Device;
+use rdma::DeviceList;
+
+use anyhow::anyhow;
+use anyhow::Result;
+
 #[derive(Debug, clap::Args)]
 pub struct Args {
     /// listen on/connect to port
@@ -71,7 +77,29 @@ pub struct Args {
     hostname: Option<String>,
 }
 
-pub fn run(args: Args) -> anyhow::Result<()> {
-    dbg!(args);
+pub fn run(args: Args) -> Result<()> {
+    dbg!(&args);
+
+    let dev_list = DeviceList::available()?;
+    let dev = select_device(&dev_list, args.ib_dev.as_deref())?;
+
+    println!("device name: {}", dev.name());
+
     todo!()
+}
+
+fn select_device<'dl>(dev_list: &'dl DeviceList, name: Option<&str>) -> Result<&'dl Device> {
+    for dev in dev_list.iter() {
+        match name {
+            Some(name) => {
+                if dev.name() == name {
+                    return Ok(dev);
+                } else {
+                    continue;
+                }
+            }
+            None => return Ok(dev),
+        }
+    }
+    Err(anyhow!("Can not select a rdma device"))
 }
