@@ -1,6 +1,11 @@
 use crate::error::last_errno;
 use crate::Context;
 
+use rdma_sys::__be64;
+use rdma_sys::ibv_device;
+use rdma_sys::{ibv_free_device_list, ibv_get_device_list};
+use rdma_sys::{ibv_get_device_guid, ibv_get_device_name};
+
 use std::ffi::CStr;
 use std::io;
 use std::mem::MaybeUninit;
@@ -8,11 +13,6 @@ use std::ops::Deref;
 use std::os::raw::c_int;
 use std::ptr::NonNull;
 use std::{fmt, mem, slice};
-
-use rdma_sys::__be64;
-use rdma_sys::ibv_device;
-use rdma_sys::{ibv_free_device_list, ibv_get_device_list};
-use rdma_sys::{ibv_get_device_guid, ibv_get_device_name};
 
 use numeric_cast::NumericCast;
 use scopeguard::guard_on_unwind;

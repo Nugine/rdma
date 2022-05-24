@@ -7,10 +7,11 @@ use crate::CompletionQueue;
 use crate::Device;
 use crate::ProtectionDomain;
 
+use rdma_sys::ibv_context;
+use rdma_sys::{ibv_close_device, ibv_open_device};
+
 use std::io;
 use std::ptr::NonNull;
-
-use rdma_sys::*;
 
 #[derive(Clone)]
 pub struct Context(pub(crate) Resource<ContextOwner>);

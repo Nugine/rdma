@@ -1,10 +1,12 @@
 use crate::cc::CompChannelOwner;
 use crate::ctx::ContextOwner;
 use crate::error::custom_error;
-use crate::resource::Resource;
-use crate::resource::ResourceOwner;
+use crate::resource::{Resource, ResourceOwner};
 use crate::CompChannel;
 use crate::Context;
+
+use rdma_sys::{ibv_comp_channel, ibv_cq};
+use rdma_sys::{ibv_create_cq, ibv_destroy_cq};
 
 use std::io;
 use std::mem;
@@ -12,8 +14,6 @@ use std::os::raw::c_int;
 use std::os::raw::c_void;
 use std::ptr;
 use std::ptr::NonNull;
-
-use rdma_sys::*;
 
 use asc::Asc;
 use numeric_cast::NumericCast;

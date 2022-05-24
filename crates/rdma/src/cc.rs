@@ -1,13 +1,13 @@
 use crate::ctx::ContextOwner;
 use crate::error::custom_error;
-use crate::resource::Resource;
-use crate::resource::ResourceOwner;
+use crate::resource::{Resource, ResourceOwner};
 use crate::Context;
+
+use rdma_sys::ibv_comp_channel;
+use rdma_sys::{ibv_create_comp_channel, ibv_destroy_comp_channel};
 
 use std::io;
 use std::ptr::NonNull;
-
-use rdma_sys::*;
 
 use asc::Asc;
 

@@ -2,10 +2,10 @@ use crate::error::from_errno;
 use crate::utils::{box_assume_init, box_new_uninit};
 use crate::Context;
 
-use std::io;
-
 use rdma_sys::ibv_device_attr;
 use rdma_sys::ibv_query_device;
+
+use std::io;
 
 pub struct DeviceAttr(Box<ibv_device_attr>);
 
@@ -36,9 +36,9 @@ impl DeviceAttr {
 mod tests {
     use super::*;
 
-    use std::mem;
-
     use rdma_sys::ibv_device_attr_ex;
+
+    use std::mem;
 
     #[test]
     fn track_type_size() {

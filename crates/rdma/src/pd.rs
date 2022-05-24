@@ -4,10 +4,11 @@ use crate::resource::Resource;
 use crate::resource::ResourceOwner;
 use crate::Context;
 
+use rdma_sys::ibv_pd;
+use rdma_sys::{ibv_alloc_pd, ibv_dealloc_pd};
+
 use std::io;
 use std::ptr::NonNull;
-
-use rdma_sys::*;
 
 use asc::Asc;
 
