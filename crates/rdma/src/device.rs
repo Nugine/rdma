@@ -9,11 +9,15 @@ use std::os::raw::c_int;
 use std::ptr::NonNull;
 use std::{fmt, mem, slice};
 
-use rdma_sys::*;
+use rdma_sys::__be64;
+use rdma_sys::ibv_device;
+use rdma_sys::{ibv_free_device_list, ibv_get_device_list};
+use rdma_sys::{ibv_get_device_guid, ibv_get_device_name};
 
 use numeric_cast::NumericCast;
 use scopeguard::guard_on_unwind;
 
+/// An array of RDMA devices.
 pub struct DeviceList {
     arr: NonNull<Device>,
     len: usize,
@@ -24,6 +28,7 @@ unsafe impl Send for DeviceList {}
 /// SAFETY: owned array
 unsafe impl Sync for DeviceList {}
 
+/// A RDMA device
 #[repr(transparent)]
 pub struct Device(NonNull<ibv_device>);
 
@@ -32,6 +37,7 @@ unsafe impl Send for Device {}
 /// SAFETY: owned type
 unsafe impl Sync for Device {}
 
+/// A RDMA device guid
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Guid(__be64);
@@ -41,6 +47,7 @@ impl DeviceList {
         self.arr.as_ptr().cast()
     }
 
+    /// Returns available rdma devices
     #[inline]
     pub fn available() -> io::Result<Self> {
         // SAFETY: ffi
@@ -67,6 +74,7 @@ impl DeviceList {
         }
     }
 
+    /// Returns the slice of devices
     #[inline]
     #[must_use]
     pub fn as_slice(&self) -> &[Device] {
@@ -92,11 +100,19 @@ impl Deref for DeviceList {
     }
 }
 
+impl fmt::Debug for DeviceList {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <[Device] as fmt::Debug>::fmt(self, f)
+    }
+}
+
 impl Device {
     pub(crate) fn ffi_ptr(&self) -> *mut ibv_device {
         self.0.as_ptr()
     }
 
+    /// Returns kernel device name
     #[inline]
     #[must_use]
     pub fn c_name(&self) -> &CStr {
@@ -104,12 +120,14 @@ impl Device {
         unsafe { CStr::from_ptr(ibv_get_device_name(self.ffi_ptr())) }
     }
 
+    /// Returns kernel device name
     #[inline]
     #[must_use]
     pub fn name(&self) -> &str {
         self.c_name().to_str().expect("non-utf8 device name")
     }
 
+    /// Returns device’s node GUID
     #[inline]
     #[must_use]
     pub fn guid(&self) -> Guid {
@@ -123,7 +141,20 @@ impl Device {
     }
 }
 
+impl fmt::Debug for Device {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = self.name();
+        let guid = self.guid();
+        f.debug_struct("Device")
+            .field("name", &name)
+            .field("guid", &guid)
+            .finish()
+    }
+}
+
 impl Guid {
+    /// Returns the bytes of GUID in network byte order.
     #[inline]
     #[must_use]
     pub fn as_bytes(&self) -> &[u8; 8] {
@@ -147,7 +178,9 @@ fn be64_to_hex<R>(src: __be64, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -
         // SAFETY: uninit project
         let bytes = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), 16) };
         let dst = hex_simd::OutBuf::from_uninit_mut(bytes);
-        hex_simd::encode_as_str(src, dst, case).unwrap()
+        let result = hex_simd::encode_as_str(src, dst, case);
+        // SAFETY: the encoding never fails
+        unsafe { result.unwrap_unchecked() }
     };
     f(ans)
 }
