@@ -2,6 +2,7 @@ use crate::error::custom_error;
 use crate::resource::Resource;
 use crate::resource::ResourceOwner;
 use crate::CompChannel;
+use crate::CompletionQueue;
 use crate::Device;
 use crate::ProtectionDomain;
 
@@ -27,6 +28,21 @@ impl Context {
     #[inline]
     pub fn create_cc(&self) -> io::Result<CompChannel> {
         CompChannel::create(self)
+    }
+
+    #[inline]
+    pub fn create_cq(&self, cqe: usize, user_data: usize) -> io::Result<CompletionQueue> {
+        CompletionQueue::create(self, cqe, user_data)
+    }
+
+    #[inline]
+    pub fn create_cq_with_cc(
+        &self,
+        cqe: usize,
+        user_data: usize,
+        cc: &CompChannel,
+    ) -> io::Result<CompletionQueue> {
+        CompletionQueue::create_with_cc(self, cqe, user_data, cc)
     }
 }
 

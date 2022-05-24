@@ -11,7 +11,8 @@
     clippy::unwrap_in_result,
     clippy::transmute_ptr_to_ptr,
     clippy::shadow_reuse,
-    clippy::default_numeric_fallback
+    clippy::default_numeric_fallback,
+    clippy::shadow_unrelated
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
@@ -34,5 +35,8 @@ pub use self::pd::ProtectionDomain;
 
 mod comp_channel;
 pub use self::comp_channel::CompChannel;
+
+mod cq;
+pub use self::cq::CompletionQueue;
 
 mod utils;
