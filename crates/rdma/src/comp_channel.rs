@@ -11,6 +11,7 @@ use rdma_sys::*;
 
 use asc::Asc;
 
+#[derive(Clone)]
 pub struct CompChannel(pub(crate) Resource<CompChannelOwner>);
 
 impl CompChannel {

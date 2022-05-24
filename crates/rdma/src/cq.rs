@@ -18,6 +18,7 @@ use rdma_sys::*;
 use asc::Asc;
 use numeric_cast::NumericCast;
 
+#[derive(Clone)]
 pub struct CompletionQueue(pub(crate) Resource<CompletionQueueOwner>);
 
 impl CompletionQueue {

@@ -44,3 +44,12 @@ impl<R: ResourceOwner> Deref for Resource<R> {
         &*self.owner
     }
 }
+
+impl<R: ResourceOwner> Clone for Resource<R> {
+    fn clone(&self) -> Self {
+        Self {
+            owner: Asc::clone(&self.owner),
+            ctype: self.ctype,
+        }
+    }
+}

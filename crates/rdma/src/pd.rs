@@ -11,6 +11,7 @@ use rdma_sys::*;
 
 use asc::Asc;
 
+#[derive(Clone)]
 pub struct ProtectionDomain(pub(crate) Resource<ProtectionDomainOwner>);
 
 impl ProtectionDomain {

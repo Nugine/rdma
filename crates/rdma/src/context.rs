@@ -11,6 +11,7 @@ use std::ptr::NonNull;
 
 use rdma_sys::*;
 
+#[derive(Clone)]
 pub struct Context(pub(crate) Resource<ContextOwner>);
 
 impl Context {
