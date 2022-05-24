@@ -27,14 +27,14 @@ pub use self::device::{Device, DeviceList, Guid};
 
 mod resource;
 
-mod context;
-pub use self::context::Context;
+mod ctx;
+pub use self::ctx::Context;
 
 mod pd;
 pub use self::pd::ProtectionDomain;
 
-mod comp_channel;
-pub use self::comp_channel::CompChannel;
+mod cc;
+pub use self::cc::CompChannel;
 
 mod cq;
 pub use self::cq::CompletionQueue;

@@ -1,5 +1,5 @@
-use crate::comp_channel::CompChannelOwner;
-use crate::context::ContextOwner;
+use crate::cc::CompChannelOwner;
+use crate::ctx::ContextOwner;
 use crate::error::custom_error;
 use crate::resource::Resource;
 use crate::resource::ResourceOwner;
