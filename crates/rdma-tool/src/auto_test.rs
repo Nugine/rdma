@@ -18,6 +18,11 @@ pub fn run() -> anyhow::Result<()> {
         let device_attr = ctx.query_device()?;
         println!("physical port count: {}", device_attr.physical_port_count());
 
+        for i in 1..=device_attr.physical_port_count() {
+            let port_attr = ctx.query_port(i)?;
+            println!("logical port state ({}): {:?}", i, port_attr.state());
+        }
+
         let _pd = ctx.alloc_pd()?;
 
         let cc = ctx.create_cc()?;
