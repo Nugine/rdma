@@ -12,7 +12,9 @@
     clippy::transmute_ptr_to_ptr,
     clippy::shadow_reuse,
     clippy::default_numeric_fallback,
-    clippy::shadow_unrelated
+    clippy::shadow_unrelated,
+    clippy::panic,
+    clippy::enum_glob_use
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO

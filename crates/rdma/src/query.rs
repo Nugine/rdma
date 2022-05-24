@@ -2,11 +2,20 @@ use crate::error::from_errno;
 use crate::utils::{box_assume_init, box_new_uninit};
 use crate::Context;
 
-use numeric_cast::NumericCast;
-use rdma_sys::{ibv_device_attr_ex, ibv_query_device_ex};
+use rdma_sys::{ibv_device_attr_ex, ibv_port_state, ibv_query_device_ex};
 use rdma_sys::{ibv_port_attr, ibv_query_port};
+use rdma_sys::{
+    IBV_PORT_ACTIVE,       //
+    IBV_PORT_ACTIVE_DEFER, //
+    IBV_PORT_ARMED,        //
+    IBV_PORT_DOWN,         //
+    IBV_PORT_INIT,         //
+    IBV_PORT_NOP,          //
+};
 
-use std::{io, ptr};
+use std::{io, mem, ptr};
+
+use numeric_cast::NumericCast;
 
 pub struct DeviceAttr(Box<ibv_device_attr_ex>);
 
@@ -59,7 +68,36 @@ impl PortAttr {
     pub(crate) fn as_inner(&self) -> &ibv_port_attr {
         self.0.as_ref()
     }
+
+    pub fn state(&self) -> PortState {
+        use self::PortState::*;
+        match self.0.state {
+            IBV_PORT_NOP => Nop,
+            IBV_PORT_DOWN => Down,
+            IBV_PORT_INIT => Init,
+            IBV_PORT_ARMED => Armed,
+            IBV_PORT_ACTIVE => Active,
+            IBV_PORT_ACTIVE_DEFER => ActiveDefer,
+            _ => panic!("unknown state"),
+        }
+    }
 }
+
+#[allow(clippy::as_conversions)]
+#[derive(Debug)]
+#[repr(u32)]
+pub enum PortState {
+    Nop = IBV_PORT_NOP as u32,
+    Down = IBV_PORT_DOWN as u32,
+    Init = IBV_PORT_INIT as u32,
+    Armed = IBV_PORT_ARMED as u32,
+    Active = IBV_PORT_ACTIVE as u32,
+    ActiveDefer = IBV_PORT_ACTIVE_DEFER as u32,
+}
+
+const _: () = {
+    assert!(mem::size_of::<ibv_port_state>() <= mem::size_of::<u32>());
+};
 
 #[cfg(test)]
 mod tests {
