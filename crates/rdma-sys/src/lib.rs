@@ -12,7 +12,13 @@ mod rsrdma {
             input: *const ibv_query_device_ex_input,
             attr: *mut ibv_device_attr_ex,
         ) -> c_int;
+        pub fn rs_ibv_query_port(
+            context: *mut ibv_context,
+            port_num: u8,
+            port_attr: *mut ibv_port_attr,
+        ) -> c_int;
     }
 }
 
 pub use self::rsrdma::rs_ibv_query_device_ex as ibv_query_device_ex;
+pub use self::rsrdma::rs_ibv_query_port as ibv_query_port;

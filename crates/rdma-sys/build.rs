@@ -51,6 +51,7 @@ fn main() {
             .blocklist_type("__pthread.+")
             .blocklist_type("timespec")
             .blocklist_type("socklen_t")
+            .blocklist_function("ibv_query_port")
             .prepend_enum_name(false)
             .default_enum_style("consts".parse().unwrap())
             .bitfield_enum("ibv_.+_flags")

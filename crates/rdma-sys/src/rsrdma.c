@@ -7,3 +7,11 @@ int rs_ibv_query_device_ex(                        //
 ) {
     return ibv_query_device_ex(context, input, attr);
 }
+
+int rs_ibv_query_port(              //
+    struct ibv_context *context,    //
+    uint8_t port_num,               //
+    struct ibv_port_attr *port_attr //
+) {
+    return ibv_query_port(context, port_num, port_attr);
+}
