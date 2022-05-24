@@ -30,4 +30,6 @@ pub use self::context::Context;
 mod pd;
 pub use self::pd::ProtectionDomain;
 
+mod comp_channel;
+
 mod utils;
