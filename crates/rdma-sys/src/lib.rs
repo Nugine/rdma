@@ -165,7 +165,7 @@ pub unsafe fn ibv_create_qp_ex(
     qp_attr: *mut ibv_qp_init_attr_ex,
 ) -> *mut ibv_qp {
     let mask = (*qp_attr).comp_mask;
-    if mask == ibv_qp_init_attr_mask::IBV_QP_INIT_ATTR_PD.0 {
+    if mask == IBV_QP_INIT_ATTR_PD {
         let pd = (*qp_attr).pd;
         return ibv_create_qp(pd, qp_attr.cast());
     }
