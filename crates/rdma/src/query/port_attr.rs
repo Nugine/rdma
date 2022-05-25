@@ -42,14 +42,13 @@ impl PortAttr {
     #[inline]
     #[must_use]
     pub fn state(&self) -> PortState {
-        use self::PortState::*;
         match self.0.state {
-            IBV_PORT_NOP => Nop,
-            IBV_PORT_DOWN => Down,
-            IBV_PORT_INIT => Init,
-            IBV_PORT_ARMED => Armed,
-            IBV_PORT_ACTIVE => Active,
-            IBV_PORT_ACTIVE_DEFER => ActiveDefer,
+            IBV_PORT_NOP => PortState::Nop,
+            IBV_PORT_DOWN => PortState::Down,
+            IBV_PORT_INIT => PortState::Init,
+            IBV_PORT_ARMED => PortState::Armed,
+            IBV_PORT_ACTIVE => PortState::Active,
+            IBV_PORT_ACTIVE_DEFER => PortState::ActiveDefer,
             _ => panic!("unknown state"),
         }
     }
