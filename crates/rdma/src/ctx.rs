@@ -6,6 +6,7 @@ use crate::resource::ResourceOwner;
 use crate::CompChannel;
 use crate::CompletionQueue;
 use crate::Device;
+use crate::Gid;
 use crate::ProtectionDomain;
 
 use rdma_sys::ibv_context;
@@ -57,6 +58,11 @@ impl Context {
     #[inline]
     pub fn query_port(&self, port_num: u32) -> io::Result<PortAttr> {
         PortAttr::query(self, port_num)
+    }
+
+    #[inline]
+    pub fn query_gid(&self, port_num: u32, index: usize) -> io::Result<Gid> {
+        Gid::query(self, port_num, index)
     }
 }
 

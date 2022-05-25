@@ -42,4 +42,4 @@ mod cq;
 pub use self::cq::CompletionQueue;
 
 mod query;
-pub use self::query::DeviceAttr;
+pub use self::query::{DeviceAttr, Gid, PortAttr};

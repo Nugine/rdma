@@ -1,8 +1,9 @@
-use crate::error::from_errno;
+use crate::error::{custom_error, from_errno};
 use crate::utils::{box_assume_init, box_new_uninit};
 use crate::Context;
 
-use rdma_sys::{ibv_device_attr_ex, ibv_port_state, ibv_query_device_ex};
+use rdma_sys::{ibv_device_attr_ex, ibv_query_device_ex};
+use rdma_sys::{ibv_gid, ibv_query_gid};
 use rdma_sys::{ibv_port_attr, ibv_query_port};
 use rdma_sys::{
     IBV_PORT_ACTIVE,       //
@@ -13,7 +14,8 @@ use rdma_sys::{
     IBV_PORT_NOP,          //
 };
 
-use std::os::raw::c_uint;
+use std::mem::MaybeUninit;
+use std::os::raw::{c_int, c_uint};
 use std::{io, mem, ptr};
 
 use numeric_cast::NumericCast;
@@ -29,7 +31,7 @@ impl DeviceAttr {
             let context = ctx.0.ffi_ptr();
             let input = ptr::null();
             let ret = ibv_query_device_ex(context, input, device_attr.as_mut_ptr());
-            if ret > 0 {
+            if ret != 0 {
                 return Err(from_errno(ret));
             }
             Ok(Self(box_assume_init(device_attr)))
@@ -55,11 +57,12 @@ impl PortAttr {
         let port_num: u8 = port_num.numeric_cast();
 
         // SAFETY: ffi
+        // TODO: port_num is out of bounds?
         unsafe {
             let mut port_attr = box_new_uninit::<ibv_port_attr>();
             let context = ctx.0.ffi_ptr();
             let ret = ibv_query_port(context, port_num, port_attr.as_mut_ptr());
-            if ret > 0 {
+            if ret != 0 {
                 return Err(from_errno(ret));
             }
             Ok(Self(box_assume_init(port_attr)))
@@ -70,6 +73,8 @@ impl PortAttr {
         self.0.as_ref()
     }
 
+    #[inline]
+    #[must_use]
     pub fn state(&self) -> PortState {
         use self::PortState::*;
         match self.0.state {
@@ -100,6 +105,46 @@ const fn to_u32(x: c_uint) -> u32 {
     assert!(!(mem::size_of::<c_uint>() > mem::size_of::<u32>() && x > u32::MAX as c_uint));
     x as u32
 }
+
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct Gid(ibv_gid);
+
+impl Gid {
+    #[inline]
+    pub fn query(ctx: &Context, port_num: u32, index: usize) -> io::Result<Self> {
+        let port_num: u8 = port_num.numeric_cast();
+        let index: c_int = index.numeric_cast();
+
+        // SAFETY: ffi
+        // TODO: port_num is out of bounds?
+        // TODO: gid index is out of bounds?
+        unsafe {
+            let mut gid = MaybeUninit::<Self>::uninit();
+            let ret = ibv_query_gid(ctx.0.ffi_ptr(), port_num, index, gid.as_mut_ptr().cast());
+            if ret != 0 {
+                return Err(custom_error("failed to query gid"));
+            }
+            Ok(gid.assume_init())
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8; 16] {
+        // SAFETY: type raw bytes
+        unsafe { &self.0.raw }
+    }
+}
+
+impl PartialEq for Gid {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
+impl Eq for Gid {}
 
 #[cfg(test)]
 mod tests {
