@@ -13,7 +13,7 @@ fn main() {
 
         let result: _ = pkg_config::Config::new()
             .atleast_version(version)
-            .statik(true)
+            .statik(false)
             .probe(lib_name);
 
         let lib = result.unwrap_or_else(|_| panic!("please install {pkg_name} {version})"));
@@ -32,7 +32,7 @@ fn main() {
 
         let result: _ = pkg_config::Config::new()
             .atleast_version(version)
-            .statik(true)
+            .statik(false)
             .probe(lib_name);
 
         let lib = result.unwrap_or_else(|_| panic!("please install {pkg_name} {version})"));
