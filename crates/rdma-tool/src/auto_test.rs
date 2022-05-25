@@ -1,4 +1,4 @@
-use rdma::{CompletionQueue, DeviceList};
+use rdma::{CompletionQueue, DeviceList, QueuePair, QueuePairType};
 
 use std::fmt;
 
@@ -80,27 +80,53 @@ pub fn run() -> anyhow::Result<()> {
         }
         indent.pop();
 
-        let _pd = ctx.alloc_pd()?;
+        let pd = ctx.alloc_pd()?;
 
         let cc = ctx.create_cc()?;
 
-        let _cq1 = {
+        let cq1 = {
             let mut options: _ = CompletionQueue::options();
             options.cqe(8).user_data(1);
             ctx.create_cq(options)?
         };
 
-        let _cq2 = {
+        let cq2 = {
             let mut options: _ = CompletionQueue::options();
             options.cqe(8).user_data(2).channel(&cc);
             ctx.create_cq(options)?
         };
 
-        let _cq3 = {
+        let cq3 = {
             let mut options: _ = CompletionQueue::options();
             options.cqe(8).user_data(3).channel(&cc);
             ctx.create_cq(options)?
         };
+
+        let qp1 = {
+            let mut options: _ = QueuePair::options();
+            options
+                .user_data(1)
+                .send_cq(&cq1)
+                .recv_cq(&cq1)
+                .pd(&pd)
+                .qp_type(QueuePairType::RC)
+                .sq_sig_all(true);
+            ctx.create_qp(options)?
+        };
+        println!("qp: {:?}", qp1.id());
+
+        let qp2 = {
+            let mut options: _ = QueuePair::options();
+            options
+                .user_data(2)
+                .send_cq(&cq2)
+                .recv_cq(&cq3)
+                .pd(&pd)
+                .qp_type(QueuePairType::UD)
+                .sq_sig_all(true);
+            ctx.create_qp(options)?
+        };
+        println!("qp: {:?}", qp2.id());
 
         println!()
     }
