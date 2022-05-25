@@ -45,7 +45,7 @@ impl PortAttr {
 
     #[inline]
     #[must_use]
-    pub fn gid_table_len(&self) -> usize {
+    pub fn gid_table_len(&self) -> u32 {
         self.0.gid_tbl_len.numeric_cast()
     }
 
