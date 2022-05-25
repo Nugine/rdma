@@ -15,3 +15,13 @@ int rs_ibv_query_port(              //
 ) {
     return ibv_query_port(context, port_num, port_attr);
 }
+
+int rs_ibv_query_gid_ex(         //
+    struct ibv_context *context, //
+    uint32_t port_num,           //
+    uint32_t gid_index,          //
+    struct ibv_gid_entry *entry, //
+    uint32_t flags               //
+) {
+    return ibv_query_gid_ex(context, port_num, gid_index, entry, flags);
+}
