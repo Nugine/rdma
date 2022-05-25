@@ -52,6 +52,12 @@ impl PortAttr {
             _ => panic!("unknown state"),
         }
     }
+
+    #[inline]
+    #[must_use]
+    pub fn gid_table_len(&self) -> usize {
+        self.0.gid_tbl_len.numeric_cast()
+    }
 }
 
 #[derive(Debug)]
