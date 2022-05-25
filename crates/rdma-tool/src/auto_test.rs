@@ -38,7 +38,7 @@ pub fn run() -> anyhow::Result<()> {
         println!("{indent}device name: {}", name);
         indent.push();
 
-        println!("{indent}device guid: {:x}", dev.guid());
+        println!("{indent}guid: {:x}", dev.guid());
         let ctx = dev.open()?;
 
         let device_attr = ctx.query_device()?;
@@ -61,15 +61,19 @@ pub fn run() -> anyhow::Result<()> {
             println!("{indent}link layer: {:?}", port_attr.link_layer());
 
             for gid_index in 0..port_attr.gid_table_len() {
-                println!("{indent} gid index: {}", gid_index);
-                indent.push();
-
-                let gid_entry = ctx.query_gid_entry(port_num, gid_index)?;
-
-                println!("{indent}gid type: {:?}", gid_entry.gid_type());
-                println!("{indent}gid: {:?}", gid_entry.gid());
-
-                indent.pop();
+                match ctx.query_gid_entry(port_num, gid_index) {
+                    Ok(gid_entry) => {
+                        println!("{indent}gid index: {}", gid_index);
+                        indent.push();
+                        println!("{indent}type: {:?}", gid_entry.gid_type());
+                        println!("{indent}gid: {:?}", gid_entry.gid());
+                        indent.pop();
+                        continue;
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
             }
 
             indent.pop();
