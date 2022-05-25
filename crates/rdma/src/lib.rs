@@ -14,7 +14,8 @@
     clippy::default_numeric_fallback,
     clippy::shadow_unrelated,
     clippy::panic,
-    clippy::enum_glob_use
+    clippy::enum_glob_use,
+    clippy::exhaustive_enums
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
@@ -41,5 +42,14 @@ pub use self::cc::CompChannel;
 mod cq;
 pub use self::cq::CompletionQueue;
 
-mod query;
-pub use self::query::{DeviceAttr, Gid, PortAttr};
+mod query {
+    mod device_attr;
+    pub use self::device_attr::*;
+
+    mod port_attr;
+    pub use self::port_attr::*;
+
+    mod gid;
+    pub use self::gid::*;
+}
+pub use self::query::*;
