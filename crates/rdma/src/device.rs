@@ -154,6 +154,12 @@ impl fmt::Debug for Device {
 }
 
 impl Guid {
+    #[inline]
+    #[must_use]
+    pub fn from_bytes(bytes: [u8; 8]) -> Self {
+        Self(u64::from_ne_bytes(bytes))
+    }
+
     /// Returns the bytes of GUID in network byte order.
     #[inline]
     #[must_use]
@@ -205,18 +211,20 @@ mod tests {
 
     use crate::utils::require_send_sync;
 
+    use const_str::hex_bytes as hex;
+
     #[test]
     fn guid_fmt() {
-        let guid = Guid(u64::from_ne_bytes([
-            0x26, 0x41, 0x8c, 0xff, 0xfe, 0x02, 0x1d, 0xf9,
-        ]));
+        const GUID_HEX: &str = "26418cfffe021df9";
+        let guid = Guid::from_bytes(hex!(GUID_HEX));
+
         let debug = format!("{:?}", guid);
         let lower_hex = format!("{:x}", guid);
         let upper_hex = format!("{:X}", guid);
 
-        assert_eq!(debug, "Guid(26418cfffe021df9)");
-        assert_eq!(lower_hex, "26418cfffe021df9");
-        assert_eq!(upper_hex, "26418CFFFE021DF9");
+        assert_eq!(debug, format!("Guid({GUID_HEX})"));
+        assert_eq!(lower_hex, GUID_HEX);
+        assert_eq!(upper_hex, GUID_HEX.to_ascii_uppercase());
     }
 
     #[test]
