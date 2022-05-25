@@ -13,6 +13,7 @@ use rdma_sys::{
     IBV_PORT_NOP,          //
 };
 
+use std::os::raw::c_uint;
 use std::{io, mem, ptr};
 
 use numeric_cast::NumericCast;
@@ -83,21 +84,22 @@ impl PortAttr {
     }
 }
 
-#[allow(clippy::as_conversions)]
 #[derive(Debug)]
 #[repr(u32)]
 pub enum PortState {
-    Nop = IBV_PORT_NOP as u32,
-    Down = IBV_PORT_DOWN as u32,
-    Init = IBV_PORT_INIT as u32,
-    Armed = IBV_PORT_ARMED as u32,
-    Active = IBV_PORT_ACTIVE as u32,
-    ActiveDefer = IBV_PORT_ACTIVE_DEFER as u32,
+    Nop = to_u32(IBV_PORT_NOP),
+    Down = to_u32(IBV_PORT_DOWN),
+    Init = to_u32(IBV_PORT_INIT),
+    Armed = to_u32(IBV_PORT_ARMED),
+    Active = to_u32(IBV_PORT_ACTIVE),
+    ActiveDefer = to_u32(IBV_PORT_ACTIVE_DEFER),
 }
 
-const _: () = {
-    assert!(mem::size_of::<ibv_port_state>() <= mem::size_of::<u32>());
-};
+#[allow(clippy::as_conversions)]
+const fn to_u32(x: c_uint) -> u32 {
+    assert!(!(mem::size_of::<c_uint>() > mem::size_of::<u32>() && x > u32::MAX as c_uint));
+    x as u32
+}
 
 #[cfg(test)]
 mod tests {
