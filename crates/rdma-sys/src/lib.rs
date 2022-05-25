@@ -159,3 +159,21 @@ pub unsafe fn ibv_query_device_ex(
     }
     ret
 }
+
+pub unsafe fn ibv_create_qp_ex(
+    context: *mut ibv_context,
+    qp_attr: *mut ibv_qp_init_attr_ex,
+) -> *mut ibv_qp {
+    let mask = (*qp_attr).comp_mask;
+    if mask == ibv_qp_init_attr_mask::IBV_QP_INIT_ATTR_PD.0 {
+        let pd = (*qp_attr).pd;
+        return ibv_create_qp(pd, qp_attr.cast());
+    }
+    let vctx = verbs_get_ctx_op!(context, create_qp_ex);
+    if vctx.is_null() {
+        set_errno(EOPNOTSUPP);
+        return ptr::null_mut();
+    }
+    let op = (*vctx).create_qp_ex.unwrap_unchecked();
+    (op)(context, qp_attr)
+}
