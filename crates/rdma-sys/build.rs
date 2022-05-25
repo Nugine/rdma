@@ -60,6 +60,7 @@ fn main() {
             .header("src/bindings.h")
             .allowlist_function("ibv.+")
             .allowlist_type("ibv.+")
+            .allowlist_var("IBV.+")
             .allowlist_function("rdma.+")
             .allowlist_type("rdma.+")
             .blocklist_type("pthread.+")
@@ -73,11 +74,21 @@ fn main() {
             .bitfield_enum("ibv_.+_mask")
             .size_t_is_usize(true)
             .rustfmt_bindings(true)
-            .rust_target("1.47".parse().unwrap())
-            .generate()
-            .expect("Unable to generate bindings");
+            .rust_target("1.47".parse().unwrap());
+
+        {
+            let mut cmd_flags = bindings.command_line_flags();
+            for flag in &mut cmd_flags {
+                let s = format!("{flag:?}");
+                *flag = s;
+            }
+
+            println!("bindgen {}", cmd_flags.join(" "));
+        }
 
         bindings
+            .generate()
+            .expect("Unable to generate bindings")
             .write_to_file(out_dir.join("bindings.rs"))
             .expect("Couldn't write bindings!");
     }
