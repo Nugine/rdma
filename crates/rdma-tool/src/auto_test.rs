@@ -78,7 +78,6 @@ pub fn run() -> anyhow::Result<()> {
 
             indent.pop();
         }
-        indent.pop();
 
         let pd = ctx.alloc_pd()?;
 
@@ -110,10 +109,15 @@ pub fn run() -> anyhow::Result<()> {
                 .recv_cq(&cq1)
                 .pd(&pd)
                 .qp_type(QueuePairType::RC)
-                .sq_sig_all(true);
+                .sq_sig_all(true)
+                .max_send_wr(8)
+                .max_recv_wr(8)
+                .max_send_sge(8)
+                .max_recv_sge(8)
+                .max_inline_data(8);
             ctx.create_qp(options)?
         };
-        println!("qp: {:?}", qp1.id());
+        println!("{indent}qp: {:?}", qp1.id());
 
         let qp2 = {
             let mut options: _ = QueuePair::options();
@@ -123,11 +127,17 @@ pub fn run() -> anyhow::Result<()> {
                 .recv_cq(&cq3)
                 .pd(&pd)
                 .qp_type(QueuePairType::UD)
-                .sq_sig_all(true);
+                .sq_sig_all(true)
+                .max_send_wr(8)
+                .max_recv_wr(8)
+                .max_send_sge(8)
+                .max_recv_sge(8)
+                .max_inline_data(8);
             ctx.create_qp(options)?
         };
-        println!("qp: {:?}", qp2.id());
+        println!("{indent}qp: {:?}", qp2.id());
 
+        indent.pop();
         println!()
     }
 
