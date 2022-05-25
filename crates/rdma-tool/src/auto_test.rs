@@ -1,4 +1,4 @@
-use rdma::DeviceList;
+use rdma::{CompletionQueue, DeviceList};
 
 use std::fmt;
 
@@ -84,11 +84,23 @@ pub fn run() -> anyhow::Result<()> {
 
         let cc = ctx.create_cc()?;
 
-        let _cq1 = ctx.create_cq(8, 1)?;
+        let _cq1 = {
+            let mut options: _ = CompletionQueue::options();
+            options.cqe(8).user_data(1);
+            ctx.create_cq(options)?
+        };
 
-        let _cq2 = ctx.create_cq_with_cc(8, 2, &cc)?;
+        let _cq2 = {
+            let mut options: _ = CompletionQueue::options();
+            options.cqe(8).user_data(2).channel(&cc);
+            ctx.create_cq(options)?
+        };
 
-        let _cq3 = ctx.create_cq_with_cc(8, 3, &cc)?;
+        let _cq3 = {
+            let mut options: _ = CompletionQueue::options();
+            options.cqe(8).user_data(3).channel(&cc);
+            ctx.create_cq(options)?
+        };
 
         println!()
     }

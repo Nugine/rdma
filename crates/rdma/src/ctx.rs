@@ -5,6 +5,7 @@ use crate::resource::Resource;
 use crate::resource::ResourceOwner;
 use crate::CompChannel;
 use crate::CompletionQueue;
+use crate::CompletionQueueOptions;
 use crate::Device;
 use crate::GidEntry;
 use crate::ProtectionDomain;
@@ -36,18 +37,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn create_cq(&self, cqe: usize, user_data: usize) -> io::Result<CompletionQueue> {
-        CompletionQueue::create(self, cqe, user_data)
-    }
-
-    #[inline]
-    pub fn create_cq_with_cc(
-        &self,
-        cqe: usize,
-        user_data: usize,
-        cc: &CompChannel,
-    ) -> io::Result<CompletionQueue> {
-        CompletionQueue::create_with_cc(self, cqe, user_data, cc)
+    pub fn create_cq(&self, options: CompletionQueueOptions) -> io::Result<CompletionQueue> {
+        CompletionQueue::create(self, options)
     }
 
     #[inline]

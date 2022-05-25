@@ -2,6 +2,7 @@ dev:
     just fmt    
     cargo clippy
     cargo test
+    cargo build --release
 
 fmt:
     cargo fmt

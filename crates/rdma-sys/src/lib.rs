@@ -30,7 +30,7 @@ mod rsrdma {
         pub fn rs_ibv_create_cq_ex(
             context: *mut ibv_context,
             cq_attr: *mut ibv_cq_init_attr_ex,
-        ) -> *mut ibv_cq;
+        ) -> *mut ibv_cq_ex;
     }
 }
 
@@ -38,3 +38,7 @@ pub use self::rsrdma::rs_ibv_create_cq_ex as ibv_create_cq_ex;
 pub use self::rsrdma::rs_ibv_query_device_ex as ibv_query_device_ex;
 pub use self::rsrdma::rs_ibv_query_gid_ex as ibv_query_gid_ex;
 pub use self::rsrdma::rs_ibv_query_port as ibv_query_port;
+
+pub unsafe fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
+    cq.cast()
+}
