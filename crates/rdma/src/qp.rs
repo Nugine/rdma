@@ -5,6 +5,7 @@ use crate::{CompletionQueue, CompletionQueueOwner};
 use crate::{Context, ContextOwner};
 use crate::{ProtectionDomain, ProtectionDomainOwner};
 
+use rdma_sys::IBV_QP_INIT_ATTR_PD;
 use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp};
 use rdma_sys::{ibv_qp, ibv_qp_cap, ibv_qp_init_attr_ex};
 use rdma_sys::{
@@ -188,6 +189,7 @@ unsafe impl ResourceOwner for QueuePairOwner {
 
 impl QueuePairOwner {
     fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
+        assert!(options.pd.is_some(), "pd is required");
         assert!(options.qp_type.is_some(), "qp_type is required");
         assert!(options.sq_sig_all.is_some(), "sq_sig_all is required");
         // SAFETY: ffi
@@ -205,9 +207,8 @@ impl QueuePairOwner {
             qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
             qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
             qp_attr.cap = options.cap;
-            if let Some(ref pd) = options.pd {
-                qp_attr.pd = pd.ctype();
-            }
+            qp_attr.pd = options.pd.as_ref().unwrap_unchecked().ctype();
+            qp_attr.comp_mask = IBV_QP_INIT_ATTR_PD;
 
             let qp = create_resource(
                 || ibv_create_qp_ex(context, &mut qp_attr),
