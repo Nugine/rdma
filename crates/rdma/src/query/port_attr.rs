@@ -37,10 +37,6 @@ impl PortAttr {
         }
     }
 
-    pub(crate) fn as_inner(&self) -> &ibv_port_attr {
-        self.0.as_ref()
-    }
-
     #[inline]
     #[must_use]
     pub fn state(&self) -> PortState {

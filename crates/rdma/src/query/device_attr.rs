@@ -31,8 +31,4 @@ impl DeviceAttr {
     pub fn physical_port_count(&self) -> u32 {
         self.0.orig_attr.phys_port_cnt.into()
     }
-
-    pub(crate) fn as_inner(&self) -> &ibv_device_attr_ex {
-        self.0.as_ref()
-    }
 }
