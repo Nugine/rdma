@@ -1,10 +1,9 @@
-use crate::error::custom_error;
+use crate::error::create_resource;
 use crate::resource::{Resource, ResourceOwner};
 use crate::utils::{bool_to_c_int, c_uint_to_u32};
-use crate::{
-    CompletionQueue, CompletionQueueOwner, Context, ContextOwner, ProtectionDomain,
-    ProtectionDomainOwner,
-};
+use crate::{CompletionQueue, CompletionQueueOwner};
+use crate::{Context, ContextOwner};
+use crate::{ProtectionDomain, ProtectionDomainOwner};
 
 use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp};
 use rdma_sys::{ibv_qp, ibv_qp_cap, ibv_qp_init_attr_ex};
@@ -210,13 +209,13 @@ impl QueuePairOwner {
                 qp_attr.pd = pd.ctype();
             }
 
-            let qp = ibv_create_qp_ex(context, &mut qp_attr);
-            if qp.is_null() {
-                return Err(custom_error("failed to create queue pair"));
-            }
-            let qp = NonNull::new_unchecked(qp.cast());
+            let qp = create_resource(
+                || ibv_create_qp_ex(context, &mut qp_attr),
+                || "failed to create queue pair",
+            )?;
+
             Ok(Self {
-                qp,
+                qp: qp.cast(),
                 _ctx: ctx.0.strong_ref(),
                 _pd: options.pd,
                 _send_cq: options.send_cq,

@@ -1,6 +1,6 @@
 use crate::cc::CompChannelOwner;
 use crate::ctx::ContextOwner;
-use crate::error::custom_error;
+use crate::error::create_resource;
 use crate::resource::{Resource, ResourceOwner};
 use crate::CompChannel;
 use crate::Context;
@@ -104,15 +104,15 @@ impl CompletionQueueOwner {
                 cq_attr.channel = cc.ctype();
             }
 
-            let cq = ibv_create_cq_ex(context, &mut cq_attr);
-            if cq.is_null() {
-                return Err(custom_error("failed to create completion queue"));
-            }
-            let cq = NonNull::new_unchecked(cq.cast());
+            let cq = create_resource(
+                || ibv_create_cq_ex(context, &mut cq_attr),
+                || "failed to create completion queue",
+            )?;
+
             Ok(Self {
+                cq: cq.cast(),
                 _ctx: ctx.0.strong_ref(),
                 _cc: options.channel,
-                cq,
             })
         }
     }

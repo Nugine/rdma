@@ -1,5 +1,5 @@
 use crate::ctx::ContextOwner;
-use crate::error::custom_error;
+use crate::error::create_resource;
 use crate::resource::{Resource, ResourceOwner};
 use crate::Context;
 
@@ -46,14 +46,14 @@ impl CompChannelOwner {
     fn create(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let cc = ibv_create_comp_channel(ctx.0.ffi_ptr());
-            if cc.is_null() {
-                return Err(custom_error("failed to create completion channel"));
-            }
-            let cc = NonNull::new_unchecked(cc);
+            let cc = create_resource(
+                || ibv_create_comp_channel(ctx.0.ffi_ptr()),
+                || "failed to create completion channel",
+            )?;
+
             Ok(Self {
-                _ctx: ctx.0.strong_ref(),
                 cc,
+                _ctx: ctx.0.strong_ref(),
             })
         }
     }

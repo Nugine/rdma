@@ -1,5 +1,5 @@
 use crate::ctx::ContextOwner;
-use crate::error::custom_error;
+use crate::error::create_resource;
 use crate::resource::Resource;
 use crate::resource::ResourceOwner;
 use crate::Context;
@@ -47,14 +47,13 @@ impl ProtectionDomainOwner {
     fn alloc(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let pd = ibv_alloc_pd(ctx.0.ffi_ptr());
-            if pd.is_null() {
-                return Err(custom_error("failed to allocate protection domain"));
-            }
-            let pd = NonNull::new_unchecked(pd);
+            let pd = create_resource(
+                || ibv_alloc_pd(ctx.0.ffi_ptr()),
+                || "failed to allocate protection domain",
+            )?;
             Ok(Self {
-                _ctx: ctx.0.strong_ref(),
                 pd,
+                _ctx: ctx.0.strong_ref(),
             })
         }
     }

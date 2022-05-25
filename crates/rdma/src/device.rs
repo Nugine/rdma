@@ -1,4 +1,4 @@
-use crate::error::last_errno;
+use crate::error::last_error;
 use crate::Context;
 
 use rdma_sys::__be64;
@@ -55,7 +55,7 @@ impl DeviceList {
             let mut num_devices: c_int = 0;
             let arr = ibv_get_device_list(&mut num_devices);
             if arr.is_null() {
-                return Err(last_errno());
+                return Err(last_error());
             }
 
             // SAFETY: repr(transparent)

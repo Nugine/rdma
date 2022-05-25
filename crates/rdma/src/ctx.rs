@@ -1,4 +1,4 @@
-use crate::error::custom_error;
+use crate::error::create_resource;
 use crate::query::DeviceAttr;
 use crate::query::PortAttr;
 use crate::resource::Resource;
@@ -15,6 +15,7 @@ use crate::QueuePairOptions;
 use rdma_sys::ibv_context;
 use rdma_sys::{ibv_close_device, ibv_open_device};
 
+use std::cell::UnsafeCell;
 use std::io;
 use std::ptr::NonNull;
 
@@ -65,7 +66,7 @@ impl Context {
 }
 
 pub(crate) struct ContextOwner {
-    ctx: NonNull<ibv_context>,
+    ctx: NonNull<UnsafeCell<ibv_context>>,
 }
 
 /// SAFETY: owned type
@@ -78,7 +79,7 @@ unsafe impl ResourceOwner for ContextOwner {
     type Ctype = ibv_context;
 
     fn ctype(&self) -> *mut Self::Ctype {
-        self.ctx.as_ptr()
+        self.ctx.as_ptr().cast()
     }
 }
 
@@ -86,12 +87,11 @@ impl ContextOwner {
     fn open(device: &Device) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let ctx = ibv_open_device(device.ffi_ptr());
-            if ctx.is_null() {
-                return Err(custom_error("failed to open device"));
-            }
-            let ctx = NonNull::new_unchecked(ctx);
-            Ok(Self { ctx })
+            let ctx = create_resource(
+                || ibv_open_device(device.ffi_ptr()),
+                || "failed to open device",
+            )?;
+            Ok(Self { ctx: ctx.cast() })
         }
     }
 }
@@ -99,7 +99,7 @@ impl ContextOwner {
 impl Drop for ContextOwner {
     fn drop(&mut self) {
         // SAFETY: ffi
-        let ret = unsafe { ibv_close_device(self.ctx.as_ptr()) };
+        let ret = unsafe { ibv_close_device(self.ctype()) };
         assert_eq!(ret, 0);
     }
 }
