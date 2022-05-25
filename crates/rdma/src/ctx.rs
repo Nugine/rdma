@@ -9,6 +9,8 @@ use crate::CompletionQueueOptions;
 use crate::Device;
 use crate::GidEntry;
 use crate::ProtectionDomain;
+use crate::QueuePair;
+use crate::QueuePairOptions;
 
 use rdma_sys::ibv_context;
 use rdma_sys::{ibv_close_device, ibv_open_device};
@@ -54,6 +56,11 @@ impl Context {
     #[inline]
     pub fn query_gid_entry(&self, port_num: u32, gid_index: u32) -> io::Result<GidEntry> {
         GidEntry::query(self, port_num, gid_index)
+    }
+
+    #[inline]
+    pub fn create_qp(&self, options: QueuePairOptions) -> io::Result<QueuePair> {
+        QueuePair::create(self, options)
     }
 }
 

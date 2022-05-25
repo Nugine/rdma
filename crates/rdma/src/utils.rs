@@ -1,6 +1,6 @@
 use std::alloc::{alloc, handle_alloc_error, Layout};
 use std::mem::{self, MaybeUninit};
-use std::os::raw::c_uint;
+use std::os::raw::{c_int, c_uint};
 
 #[cfg(test)]
 pub fn require_send_sync<T: Send + Sync>() {}
@@ -28,4 +28,12 @@ pub unsafe fn box_assume_init<T>(b: Box<MaybeUninit<T>>) -> Box<T> {
 pub const fn c_uint_to_u32(x: c_uint) -> u32 {
     assert!(!(mem::size_of::<c_uint>() > mem::size_of::<u32>() && x > u32::MAX as c_uint));
     x as u32
+}
+
+pub const fn bool_to_c_int(b: bool) -> c_int {
+    if b {
+        1
+    } else {
+        0
+    }
 }
