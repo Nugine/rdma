@@ -23,8 +23,9 @@ impl CompChannel {
 }
 
 pub(crate) struct CompChannelOwner {
-    _ctx: Asc<ContextOwner>,
     cc: NonNull<ibv_comp_channel>,
+
+    _ctx: Asc<ContextOwner>,
 }
 
 /// SAFETY: owned type

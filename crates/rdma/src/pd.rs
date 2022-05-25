@@ -24,8 +24,9 @@ impl ProtectionDomain {
 }
 
 pub(crate) struct ProtectionDomainOwner {
-    _ctx: Asc<ContextOwner>,
     pd: NonNull<ibv_pd>,
+
+    _ctx: Asc<ContextOwner>,
 }
 
 /// SAFETY: owned type

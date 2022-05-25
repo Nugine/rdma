@@ -69,9 +69,10 @@ impl CompletionQueueOptions {
 }
 
 pub(crate) struct CompletionQueueOwner {
+    cq: NonNull<UnsafeCell<ibv_cq>>,
+
     _ctx: Asc<ContextOwner>,
     _cc: Option<Asc<CompChannelOwner>>,
-    cq: NonNull<UnsafeCell<ibv_cq>>,
 }
 
 /// SAFETY: owned type
