@@ -3,8 +3,10 @@ use crate::utils::{box_assume_init, box_new_uninit, c_uint_to_u32};
 use crate::Context;
 
 use std::io;
+use std::os::raw::c_uint;
 
 use rdma_sys::{ibv_port_attr, ibv_query_port};
+use rdma_sys::{IBV_LINK_LAYER_ETHERNET, IBV_LINK_LAYER_INFINIBAND, IBV_LINK_LAYER_UNSPECIFIED};
 use rdma_sys::{
     IBV_PORT_ACTIVE,       //
     IBV_PORT_ACTIVE_DEFER, //
@@ -42,21 +44,19 @@ impl PortAttr {
     #[inline]
     #[must_use]
     pub fn state(&self) -> PortState {
-        match self.0.state {
-            IBV_PORT_NOP => PortState::Nop,
-            IBV_PORT_DOWN => PortState::Down,
-            IBV_PORT_INIT => PortState::Init,
-            IBV_PORT_ARMED => PortState::Armed,
-            IBV_PORT_ACTIVE => PortState::Active,
-            IBV_PORT_ACTIVE_DEFER => PortState::ActiveDefer,
-            _ => panic!("unknown state"),
-        }
+        PortState::from_c_uint(self.0.state)
     }
 
     #[inline]
     #[must_use]
     pub fn gid_table_len(&self) -> usize {
         self.0.gid_tbl_len.numeric_cast()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn link_layer(&self) -> LinkLayer {
+        LinkLayer::from_c_uint(c_uint::from(self.0.link_layer))
     }
 }
 
@@ -69,4 +69,37 @@ pub enum PortState {
     Armed = c_uint_to_u32(IBV_PORT_ARMED),
     Active = c_uint_to_u32(IBV_PORT_ACTIVE),
     ActiveDefer = c_uint_to_u32(IBV_PORT_ACTIVE_DEFER),
+}
+
+impl PortState {
+    fn from_c_uint(val: c_uint) -> PortState {
+        match val {
+            IBV_PORT_NOP => PortState::Nop,
+            IBV_PORT_DOWN => PortState::Down,
+            IBV_PORT_INIT => PortState::Init,
+            IBV_PORT_ARMED => PortState::Armed,
+            IBV_PORT_ACTIVE => PortState::Active,
+            IBV_PORT_ACTIVE_DEFER => PortState::ActiveDefer,
+            _ => panic!("unknown state"),
+        }
+    }
+}
+
+#[derive(Debug)]
+#[repr(u32)]
+pub enum LinkLayer {
+    Ethernet = c_uint_to_u32(IBV_LINK_LAYER_ETHERNET),
+    Infiniband = c_uint_to_u32(IBV_LINK_LAYER_INFINIBAND),
+    Unspecified = c_uint_to_u32(IBV_LINK_LAYER_UNSPECIFIED),
+}
+
+impl LinkLayer {
+    fn from_c_uint(val: c_uint) -> LinkLayer {
+        match val {
+            IBV_LINK_LAYER_ETHERNET => LinkLayer::Ethernet,
+            IBV_LINK_LAYER_INFINIBAND => LinkLayer::Infiniband,
+            IBV_LINK_LAYER_UNSPECIFIED => LinkLayer::Unspecified,
+            _ => panic!("unknown link layer"),
+        }
+    }
 }
