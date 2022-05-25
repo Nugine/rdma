@@ -12,6 +12,7 @@ use numeric_cast::NumericCast;
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct Gid(ibv_gid);
+// TODO: ibv_query_gid_ex
 
 impl Gid {
     #[inline]
@@ -20,8 +21,6 @@ impl Gid {
         let index: c_int = index.numeric_cast();
 
         // SAFETY: ffi
-        // TODO: port_num is out of bounds?
-        // TODO: gid index is out of bounds?
         unsafe {
             let mut gid = MaybeUninit::<Self>::uninit();
             let ret = ibv_query_gid(ctx.0.ffi_ptr(), port_num, index, gid.as_mut_ptr().cast());

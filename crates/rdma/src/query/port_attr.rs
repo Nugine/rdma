@@ -24,7 +24,6 @@ impl PortAttr {
         let port_num: u8 = port_num.numeric_cast();
 
         // SAFETY: ffi
-        // TODO: port_num is out of bounds?
         unsafe {
             let mut port_attr = box_new_uninit::<ibv_port_attr>();
             let context = ctx.0.ffi_ptr();
