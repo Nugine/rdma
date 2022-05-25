@@ -26,9 +26,15 @@ mod rsrdma {
             entry: *mut ibv_gid_entry,
             flags: u32,
         ) -> c_int;
+
+        pub fn rs_ibv_create_cq_ex(
+            context: *mut ibv_context,
+            cq_attr: *mut ibv_cq_init_attr_ex,
+        ) -> *mut ibv_cq;
     }
 }
 
+pub use self::rsrdma::rs_ibv_create_cq_ex as ibv_create_cq_ex;
 pub use self::rsrdma::rs_ibv_query_device_ex as ibv_query_device_ex;
 pub use self::rsrdma::rs_ibv_query_gid_ex as ibv_query_gid_ex;
 pub use self::rsrdma::rs_ibv_query_port as ibv_query_port;

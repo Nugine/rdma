@@ -25,3 +25,10 @@ int rs_ibv_query_gid_ex(         //
 ) {
     return ibv_query_gid_ex(context, port_num, gid_index, entry, flags);
 }
+
+struct ibv_cq_ex *rs_ibv_create_cq_ex(  //
+    struct ibv_context *context,        //
+    struct ibv_cq_init_attr_ex *cq_attr //
+) {
+    return ibv_create_cq_ex(context, cq_attr);
+}
