@@ -28,19 +28,19 @@ mod resource;
 mod utils;
 
 mod device;
-pub use self::device::{Device, DeviceList, Guid};
+pub use self::device::*;
 
 mod ctx;
-pub use self::ctx::Context;
+pub use self::ctx::*;
 
 mod pd;
-pub use self::pd::ProtectionDomain;
+pub use self::pd::*;
 
 mod cc;
-pub use self::cc::CompChannel;
+pub use self::cc::*;
 
 mod cq;
-pub use self::cq::CompletionQueue;
+pub use self::cq::*;
 
 mod query {
     mod device_attr;
