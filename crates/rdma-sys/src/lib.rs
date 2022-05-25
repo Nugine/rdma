@@ -4,41 +4,158 @@
 use libc::*;
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-mod rsrdma {
-    use super::*;
-    extern "C" {
-        pub fn rs_ibv_query_device_ex(
-            context: *mut ibv_context,
-            input: *const ibv_query_device_ex_input,
-            attr: *mut ibv_device_attr_ex,
-        ) -> c_int;
+// -------- libibverbs 1.14.41 -----------------------
+// static inline functions
 
-        pub fn rs_ibv_query_port(
-            context: *mut ibv_context,
-            port_num: u8,
-            port_attr: *mut ibv_port_attr,
-        ) -> c_int;
-
-        pub fn rs_ibv_query_gid_ex(
-            context: *mut ibv_context,
-            port_num: u32,
-            gid_index: u32,
-            entry: *mut ibv_gid_entry,
-            flags: u32,
-        ) -> c_int;
-
-        pub fn rs_ibv_create_cq_ex(
-            context: *mut ibv_context,
-            cq_attr: *mut ibv_cq_init_attr_ex,
-        ) -> *mut ibv_cq_ex;
-    }
-}
-
-pub use self::rsrdma::rs_ibv_create_cq_ex as ibv_create_cq_ex;
-pub use self::rsrdma::rs_ibv_query_device_ex as ibv_query_device_ex;
-pub use self::rsrdma::rs_ibv_query_gid_ex as ibv_query_gid_ex;
-pub use self::rsrdma::rs_ibv_query_port as ibv_query_port;
+use std::mem;
+use std::ops::Not;
+use std::ptr;
 
 pub unsafe fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
     cq.cast()
+}
+
+/// Calculates the offset of the specified field from the start of the named struct.
+/// This macro is impossible to be const until feature(const_ptr_offset_from) is stable.
+macro_rules! offset_of {
+    ($ty: path, $field: tt) => {{
+        // ensure the type is a named struct
+        // ensure the field exists and is accessible
+        let $ty { $field: _, .. };
+
+        let uninit = <::core::mem::MaybeUninit<$ty>>::uninit(); // const since 1.36
+
+        let base_ptr: *const $ty = uninit.as_ptr(); // const since 1.59
+
+        #[allow(unused_unsafe)]
+        let field_ptr = unsafe { ::core::ptr::addr_of!((*base_ptr).$field) }; // since 1.51
+
+        // // the const version requires feature(const_ptr_offset_from)
+        // // https://github.com/rust-lang/rust/issues/92980
+        // #[allow(unused_unsafe)]
+        // unsafe { (field_ptr as *const u8).offset_from(base_ptr as *const u8) as usize }
+
+        (field_ptr as usize) - (base_ptr as usize)
+    }};
+}
+
+macro_rules! container_of {
+    ($ptr: expr, $ty: path, $field: tt) => {{
+        let ptr = $ptr;
+        let offset = offset_of!($ty, $field);
+        ptr.cast::<u8>().sub(offset).cast::<$ty>()
+    }};
+}
+
+unsafe fn set_errno(errno: i32) {
+    __errno_location().write(errno)
+}
+
+unsafe fn verbs_get_ctx(ctx: *mut ibv_context) -> *mut verbs_context {
+    if (*ctx).abi_compat != mem::transmute::<_, *mut c_void>(usize::MAX) {
+        return ptr::null_mut();
+    }
+    container_of!(ctx, verbs_context, context)
+}
+
+macro_rules! verbs_get_ctx_op {
+    ($ctx: expr, $op: tt) => {{
+        let vctx: *mut verbs_context = verbs_get_ctx($ctx);
+        if vctx.is_null()
+            || (*vctx).sz < ::core::mem::size_of::<verbs_context>() - offset_of!(verbs_context, $op)
+            || (*vctx).$op.is_none()
+        {
+            ptr::null_mut()
+        } else {
+            vctx
+        }
+    }};
+}
+
+pub unsafe fn ibv_create_cq_ex(
+    context: *mut ibv_context,
+    cq_attr: *mut ibv_cq_init_attr_ex,
+) -> *mut ibv_cq_ex {
+    let vctx = verbs_get_ctx_op!(context, create_cq_ex);
+    if vctx.is_null() {
+        set_errno(EOPNOTSUPP);
+        return ptr::null_mut();
+    }
+    let op = (*vctx).create_cq_ex.unwrap_unchecked();
+    (op)(context, cq_attr)
+}
+
+pub unsafe fn ibv_query_gid_ex(
+    context: *mut ibv_context,
+    port_num: u32,
+    gid_index: u32,
+    entry: *mut ibv_gid_entry,
+    flags: u32,
+) -> c_int {
+    _ibv_query_gid_ex(
+        context,
+        port_num,
+        gid_index,
+        entry,
+        flags,
+        mem::size_of::<ibv_gid_entry>(),
+    )
+}
+
+mod compat {
+    use super::{_compat_ibv_port_attr, c_int, ibv_context};
+
+    extern "C" {
+        pub fn ibv_query_port(
+            context: *mut ibv_context,
+            port_num: u8,
+            port_attr: *mut _compat_ibv_port_attr,
+        ) -> c_int;
+    }
+}
+
+pub unsafe fn ibv_query_port(
+    context: *mut ibv_context,
+    port_num: u8,
+    port_attr: *mut ibv_port_attr,
+) -> c_int {
+    let vctx: *mut verbs_context = verbs_get_ctx_op!(context, query_port);
+    if vctx.is_null() {
+        ptr::write_bytes(port_attr, 0, 1);
+        return compat::ibv_query_port(context, port_num, port_attr.cast());
+    }
+    let op = (*vctx).query_port.unwrap_unchecked();
+    (op)(
+        context,
+        port_num,
+        port_attr,
+        mem::size_of::<ibv_port_attr>(),
+    )
+}
+
+pub unsafe fn ibv_query_device_ex(
+    context: *mut ibv_context,
+    input: *const ibv_query_device_ex_input,
+    attr: *mut ibv_device_attr_ex,
+) -> c_int {
+    if input.is_null().not() && (*input).comp_mask != 0 {
+        return EINVAL;
+    }
+
+    let legacy = || {
+        ptr::write_bytes(attr, 0, 1);
+        ibv_query_device(context, ptr::addr_of_mut!((*attr).orig_attr))
+    };
+
+    let vctx: *mut verbs_context = verbs_get_ctx_op!(context, query_device_ex);
+    if vctx.is_null() {
+        return legacy();
+    }
+
+    let op = (*vctx).query_device_ex.unwrap_unchecked();
+    let ret = (op)(context, input, attr, mem::size_of::<ibv_device_attr_ex>());
+    if ret == EOPNOTSUPP || ret == ENOSYS {
+        return legacy();
+    }
+    ret
 }

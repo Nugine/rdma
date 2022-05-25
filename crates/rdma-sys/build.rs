@@ -4,6 +4,8 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    println!("cargo:rerun-if-changed=src");
+
     let mut include_paths: Vec<String> = Vec::new();
 
     {
@@ -61,6 +63,8 @@ fn main() {
             .allowlist_function("ibv.+")
             .allowlist_type("ibv.+")
             .allowlist_var("IBV.+")
+            .allowlist_type("verbs.+")
+            .allowlist_function("_ibv_query_gid_ex")
             .allowlist_function("rdma.+")
             .allowlist_type("rdma.+")
             .blocklist_type("pthread.+")
@@ -91,17 +95,5 @@ fn main() {
             .expect("Unable to generate bindings")
             .write_to_file(out_dir.join("bindings.rs"))
             .expect("Couldn't write bindings!");
-    }
-
-    {
-        let file = "src/rsrdma.c";
-        let lib = "rsrdma";
-
-        cc::Build::new()
-            .file(file)
-            .includes(&include_paths)
-            .compile(lib);
-
-        println!("cargo:rustc-link-lib=static={}", lib);
     }
 }
