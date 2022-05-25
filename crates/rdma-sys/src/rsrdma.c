@@ -1,4 +1,4 @@
-#include <infiniband/verbs.h>
+#include "bindings.h"
 
 int rs_ibv_query_device_ex(                        //
     struct ibv_context *context,                   //
