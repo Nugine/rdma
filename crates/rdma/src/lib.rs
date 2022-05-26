@@ -34,6 +34,7 @@ pub mod ctx;
 pub mod device;
 pub mod pd;
 pub mod qp;
+pub mod wc;
 
 pub mod query {
     mod device_attr;

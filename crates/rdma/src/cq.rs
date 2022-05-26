@@ -3,18 +3,22 @@ use crate::ctx::{self, Context};
 use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, ptr_as_mut};
+use crate::wc::WorkCompletion;
 
-use rdma_sys::{ibv_ack_cq_events, ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
-use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
+use rdma_sys::ibv_cq_ex_to_cq;
+use rdma_sys::{ibv_ack_cq_events, ibv_req_notify_cq};
+use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_init_attr_ex};
+use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq};
+use rdma_sys::{ibv_poll_cq, ibv_wc};
 
 use std::cell::UnsafeCell;
-use std::io;
-use std::mem::{self, ManuallyDrop};
-use std::os::raw::{c_uint, c_void};
+use std::mem::{self, ManuallyDrop, MaybeUninit};
+use std::os::raw::{c_int, c_uint, c_void};
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Weak};
+use std::{io, slice};
 
 use numeric_cast::NumericCast;
 
@@ -127,6 +131,26 @@ impl CompletionQueue {
     #[inline]
     pub fn ack_cq_events(&self, cnt: u32) {
         self.0.comp_events_completed.fetch_add(cnt, Relaxed);
+    }
+
+    #[inline]
+    pub fn poll(
+        &self,
+        buf: &mut [MaybeUninit<WorkCompletion>],
+    ) -> io::Result<&mut [WorkCompletion]> {
+        // SAFETY: ffi
+        unsafe {
+            let num_entries: c_int = buf.len().numeric_cast();
+            let wc = buf.as_mut_ptr().cast::<ibv_wc>();
+            let cq = ibv_cq_ex_to_cq(self.ffi_ptr());
+            let ret = ibv_poll_cq(cq, num_entries, wc);
+            if ret < 0 {
+                return Err(from_errno(ret.wrapping_neg()));
+            }
+            let len: usize = ret.numeric_cast();
+            let data = wc.cast::<WorkCompletion>();
+            Ok(slice::from_raw_parts_mut(data, len))
+        }
     }
 }
 
