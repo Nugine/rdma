@@ -183,3 +183,9 @@ pub unsafe fn ibv_req_notify_cq(cq: *mut ibv_cq, solicited_only: c_int) -> c_int
     let op: _ = (*ctx).ops.req_notify_cq.unwrap_unchecked();
     (op)(cq, solicited_only)
 }
+
+pub unsafe fn ibv_poll_cq(cq: *mut ibv_cq, num_entries: c_int, wc: *mut ibv_wc) -> c_int {
+    let ctx: *mut ibv_context = (*cq).context;
+    let op: _ = (*ctx).ops.poll_cq.unwrap_unchecked();
+    (op)(cq, num_entries, wc)
+}
