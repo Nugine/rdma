@@ -9,7 +9,7 @@ use std::io;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-pub struct ProtectionDomain(Arc<Inner>);
+pub struct ProtectionDomain(Arc<Owner>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for ProtectionDomain {
@@ -27,23 +27,23 @@ unsafe impl Resource for ProtectionDomain {
 impl ProtectionDomain {
     #[inline]
     pub fn alloc(ctx: &Context) -> io::Result<Self> {
-        let inner = Inner::alloc(ctx)?;
-        Ok(Self(Arc::new(inner)))
+        let owner = Owner::alloc(ctx)?;
+        Ok(Self(Arc::new(owner)))
     }
 }
 
-struct Inner {
+struct Owner {
     pd: NonNull<ibv_pd>,
 
     _ctx: Context,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for Owner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for Owner {}
 
-impl Inner {
+impl Owner {
     fn alloc(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -59,7 +59,7 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
+impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         let ret = unsafe { ibv_dealloc_pd(self.pd.as_ptr()) };

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use numeric_cast::NumericCast;
 
-pub struct CompletionQueue(Pin<Arc<Inner>>);
+pub struct CompletionQueue(Pin<Arc<Owner>>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for CompletionQueue {
@@ -41,14 +41,14 @@ impl CompletionQueue {
 
     #[inline]
     pub fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
-        let inner = Arc::pin(Inner::create(ctx, options)?);
+        let owner = Arc::pin(Owner::create(ctx, options)?);
         // SAFETY: setup self-reference in cq_context
         unsafe {
-            let cq: *mut ibv_cq_ex = inner.cq.as_ptr().cast();
-            let inner_ptr: *const Inner = &*inner;
-            (*cq).cq_context = ptr_as_mut(inner_ptr).cast();
+            let cq: *mut ibv_cq_ex = owner.cq.as_ptr().cast();
+            let owner_ptr: *const Owner = &*owner;
+            (*cq).cq_context = ptr_as_mut(owner_ptr).cast();
         };
-        Ok(Self(inner))
+        Ok(Self(owner))
     }
 
     #[inline]
@@ -61,9 +61,9 @@ impl CompletionQueue {
     /// 1. `cq_context` must come from `CompletionQueue::ffi_ptr`
     /// 2. the completion queue must be alive when calling this method
     pub(crate) unsafe fn from_cq_context(cq_context: *mut c_void) -> Self {
-        let inner_ptr: *const Inner = cq_context.cast();
-        let inner = ManuallyDrop::new(Arc::from_raw(inner_ptr));
-        Self(Pin::new(Arc::clone(&inner)))
+        let owner_ptr: *const Owner = cq_context.cast();
+        let owner = ManuallyDrop::new(Arc::from_raw(owner_ptr));
+        Self(Pin::new(Arc::clone(&owner)))
     }
 
     fn req_notify(&self, solicited_only: bool) -> io::Result<()> {
@@ -90,7 +90,7 @@ impl CompletionQueue {
     }
 }
 
-struct Inner {
+struct Owner {
     cq: NonNull<UnsafeCell<ibv_cq>>,
     user_data: usize,
 
@@ -99,11 +99,11 @@ struct Inner {
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for Owner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for Owner {}
 
-impl Inner {
+impl Owner {
     // TODO: comp vector
     fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
         // SAFETY: ffi
@@ -133,7 +133,7 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
+impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {

@@ -10,7 +10,7 @@ use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-pub struct CompChannel(Arc<Inner>);
+pub struct CompChannel(Arc<Owner>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for CompChannel {
@@ -28,8 +28,8 @@ unsafe impl Resource for CompChannel {
 impl CompChannel {
     #[inline]
     pub fn create(ctx: &Context) -> io::Result<Self> {
-        let inner = Inner::create(ctx)?;
-        Ok(Self(Arc::new(inner)))
+        let owner = Owner::create(ctx)?;
+        Ok(Self(Arc::new(owner)))
     }
 }
 
@@ -42,18 +42,18 @@ impl AsRawFd for CompChannel {
     }
 }
 
-struct Inner {
+struct Owner {
     cc: NonNull<ibv_comp_channel>,
 
     _ctx: Context,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for Owner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for Owner {}
 
-impl Inner {
+impl Owner {
     fn create(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -70,7 +70,7 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
+impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         let ret = unsafe { ibv_destroy_comp_channel(self.cc.as_ptr()) };

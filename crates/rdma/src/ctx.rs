@@ -17,7 +17,7 @@ use std::io;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-pub struct Context(Arc<Inner>);
+pub struct Context(Arc<Owner>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for Context {
@@ -35,8 +35,8 @@ unsafe impl Resource for Context {
 impl Context {
     #[inline]
     pub fn open(device: &Device) -> io::Result<Self> {
-        let inner = Inner::open(device)?;
-        Ok(Self(Arc::new(inner)))
+        let owner = Owner::open(device)?;
+        Ok(Self(Arc::new(owner)))
     }
 
     #[inline]
@@ -75,16 +75,16 @@ impl Context {
     }
 }
 
-pub(crate) struct Inner {
+pub(crate) struct Owner {
     ctx: NonNull<UnsafeCell<ibv_context>>,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for Owner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for Owner {}
 
-impl Inner {
+impl Owner {
     fn open(device: &Device) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -97,7 +97,7 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
+impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {

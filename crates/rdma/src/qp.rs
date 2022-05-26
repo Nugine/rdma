@@ -23,7 +23,7 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 use std::{io, mem};
 
-pub struct QueuePair(Arc<Inner>);
+pub struct QueuePair(Arc<Owner>);
 
 impl QueuePair {
     #[inline]
@@ -34,8 +34,8 @@ impl QueuePair {
 
     #[inline]
     pub fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
-        let inner = Inner::create(ctx, options)?;
-        Ok(Self(Arc::new(inner)))
+        let owner = Owner::create(ctx, options)?;
+        Ok(Self(Arc::new(owner)))
     }
 
     #[inline]
@@ -68,7 +68,7 @@ unsafe impl Resource for QueuePair {
     }
 }
 
-struct Inner {
+struct Owner {
     qp: NonNull<UnsafeCell<ibv_qp>>,
 
     _ctx: Context,
@@ -78,11 +78,11 @@ struct Inner {
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Inner {}
+unsafe impl Send for Owner {}
 /// SAFETY: owned type
-unsafe impl Sync for Inner {}
+unsafe impl Sync for Owner {}
 
-impl Inner {
+impl Owner {
     fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
         assert!(options.pd.is_some(), "pd is required");
         assert!(options.qp_type.is_some(), "qp_type is required");
@@ -121,7 +121,7 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
+impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {
