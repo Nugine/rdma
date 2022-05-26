@@ -1,7 +1,7 @@
+use crate::ctx::Context;
 use crate::error::from_errno;
 use crate::resource::Resource;
 use crate::utils::{box_assume_init, box_new_uninit, c_uint_to_u32};
-use crate::Context;
 
 use std::io;
 use std::os::raw::c_uint;

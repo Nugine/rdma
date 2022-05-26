@@ -1,6 +1,6 @@
+use crate::ctx::Context;
 use crate::error::create_resource;
 use crate::resource::Resource;
-use crate::Context;
 
 use rdma_sys::ibv_pd;
 use rdma_sys::{ibv_alloc_pd, ibv_dealloc_pd};

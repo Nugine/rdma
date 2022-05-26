@@ -8,7 +8,7 @@ struct DeviceInfo {
 }
 
 pub fn run() -> anyhow::Result<()> {
-    let dev_list = rdma::DeviceList::available()?;
+    let dev_list = rdma::device::DeviceList::available()?;
 
     if dev_list.is_empty() {
         println!("No available rdma devices");

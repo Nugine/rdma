@@ -1,15 +1,13 @@
+use crate::cc::CompChannel;
+use crate::cq::{CompletionQueue, CompletionQueueOptions};
+use crate::device::Device;
 use crate::error::create_resource;
+use crate::pd::ProtectionDomain;
+use crate::qp::{QueuePair, QueuePairOptions};
 use crate::query::DeviceAttr;
+use crate::query::GidEntry;
 use crate::query::PortAttr;
 use crate::resource::Resource;
-use crate::CompChannel;
-use crate::CompletionQueue;
-use crate::CompletionQueueOptions;
-use crate::Device;
-use crate::GidEntry;
-use crate::ProtectionDomain;
-use crate::QueuePair;
-use crate::QueuePairOptions;
 
 use rdma_sys::ibv_context;
 use rdma_sys::{ibv_close_device, ibv_open_device};

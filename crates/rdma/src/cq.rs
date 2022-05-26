@@ -1,8 +1,8 @@
+use crate::cc::CompChannel;
+use crate::ctx::Context;
 use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
 use crate::utils::bool_to_c_int;
-use crate::CompChannel;
-use crate::Context;
 
 use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
 use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};

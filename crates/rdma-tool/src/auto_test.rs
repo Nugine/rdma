@@ -1,4 +1,6 @@
-use rdma::{CompletionQueue, DeviceList, QueuePair, QueuePairType};
+use rdma::cq::CompletionQueue;
+use rdma::device::DeviceList;
+use rdma::qp::{QueuePair, QueuePairType};
 
 use std::fmt;
 

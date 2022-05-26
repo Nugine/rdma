@@ -1,6 +1,6 @@
+use crate::ctx::Context;
 use crate::error::create_resource;
 use crate::resource::Resource;
-use crate::Context;
 
 use rdma_sys::ibv_comp_channel;
 use rdma_sys::{ibv_create_comp_channel, ibv_destroy_comp_channel};

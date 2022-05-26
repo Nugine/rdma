@@ -1,7 +1,7 @@
+use crate::ctx::Context;
 use crate::error::custom_error;
 use crate::resource::Resource;
 use crate::utils::c_uint_to_u32;
-use crate::Context;
 
 use rdma_sys::{ibv_gid, ibv_gid_entry, ibv_query_gid_ex};
 use rdma_sys::{IBV_GID_TYPE_IB, IBV_GID_TYPE_ROCE_V1, IBV_GID_TYPE_ROCE_V2};

@@ -27,22 +27,14 @@ mod error;
 mod resource;
 mod utils;
 
-mod device;
-pub use self::device::*;
+pub mod cc;
+pub mod cq;
+pub mod ctx;
+pub mod device;
+pub mod pd;
+pub mod qp;
 
-mod ctx;
-pub use self::ctx::*;
-
-mod pd;
-pub use self::pd::*;
-
-mod cc;
-pub use self::cc::*;
-
-mod cq;
-pub use self::cq::*;
-
-mod query {
+pub mod query {
     mod device_attr;
     pub use self::device_attr::*;
 
@@ -52,7 +44,3 @@ mod query {
     mod gid;
     pub use self::gid::*;
 }
-pub use self::query::*;
-
-mod qp;
-pub use self::qp::*;

@@ -1,4 +1,4 @@
-use rdma::DeviceList;
+use rdma::device::DeviceList;
 
 use anyhow::anyhow;
 use anyhow::Result;

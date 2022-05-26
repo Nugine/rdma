@@ -1,9 +1,9 @@
+use crate::cq::CompletionQueue;
+use crate::ctx::Context;
 use crate::error::create_resource;
+use crate::pd::ProtectionDomain;
 use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, c_uint_to_u32};
-use crate::CompletionQueue;
-use crate::Context;
-use crate::ProtectionDomain;
 
 use rdma_sys::IBV_QP_INIT_ATTR_PD;
 use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp};

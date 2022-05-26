@@ -1,5 +1,5 @@
+use crate::ctx::Context;
 use crate::error::last_error;
-use crate::Context;
 
 use rdma_sys::__be64;
 use rdma_sys::ibv_device;
