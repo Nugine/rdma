@@ -60,9 +60,13 @@ impl CompletionQueue {
                 cq: cq.cast(),
                 user_data: options.user_data,
                 _ctx: ctx.strong_ref(),
-                _cc: options.channel,
+                cc: options.channel,
             })
         };
+
+        if let Some(ref cc) = owner.cc {
+            cc.add_cq_ref(Arc::downgrade(&owner));
+        }
 
         // SAFETY: setup self-reference in cq_context
         unsafe {
@@ -121,8 +125,8 @@ pub(crate) struct Owner {
     cq: NonNull<UnsafeCell<ibv_cq>>,
     user_data: usize,
 
+    cc: Option<Arc<cc::Owner>>,
     _ctx: Arc<ctx::Owner>,
-    _cc: Option<Arc<cc::Owner>>,
 }
 
 /// SAFETY: owned type
@@ -138,6 +142,10 @@ impl Owner {
 
 impl Drop for Owner {
     fn drop(&mut self) {
+        if let Some(ref cc) = self.cc {
+            cc.del_cq_ref(self);
+        }
+
         // SAFETY: ffi
         unsafe {
             let cq = self.ffi_ptr();

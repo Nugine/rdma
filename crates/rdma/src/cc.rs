@@ -1,14 +1,17 @@
+use crate::cq;
 use crate::ctx::{self, Context};
 use crate::error::create_resource;
 use crate::resource::Resource;
+use crate::weakset::WeakSet;
 
+use parking_lot::Mutex;
 use rdma_sys::ibv_comp_channel;
 use rdma_sys::{ibv_create_comp_channel, ibv_destroy_comp_channel};
 
 use std::io;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::ptr::NonNull;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 pub struct CompChannel(Arc<Owner>);
 
@@ -37,6 +40,7 @@ impl CompChannel {
 
             Arc::new(Owner {
                 cc,
+                cq_ref: Mutex::new(WeakSet::new()),
                 _ctx: ctx.strong_ref(),
             })
         };
@@ -56,6 +60,7 @@ impl AsRawFd for CompChannel {
 pub(crate) struct Owner {
     cc: NonNull<ibv_comp_channel>,
 
+    cq_ref: Mutex<WeakSet<cq::Owner>>,
     _ctx: Arc<ctx::Owner>,
 }
 
@@ -67,6 +72,14 @@ unsafe impl Sync for Owner {}
 impl Owner {
     pub(crate) fn ffi_ptr(&self) -> *mut ibv_comp_channel {
         self.cc.as_ptr()
+    }
+
+    pub(crate) fn add_cq_ref(&self, cq: Weak<cq::Owner>) {
+        self.cq_ref.lock().insert(cq);
+    }
+
+    pub(crate) fn del_cq_ref(&self, cq: &cq::Owner) {
+        self.cq_ref.lock().remove(cq);
     }
 }
 
