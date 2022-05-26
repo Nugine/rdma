@@ -1,6 +1,6 @@
 use std::alloc::{alloc, handle_alloc_error, Layout};
 use std::mem::{self, MaybeUninit};
-use std::os::raw::{c_int, c_uint};
+use std::os::raw::{c_int, c_uint, c_void};
 
 #[cfg(test)]
 pub fn require_send_sync<T: Send + Sync>() {}
@@ -36,4 +36,24 @@ pub const fn bool_to_c_int(b: bool) -> c_int {
     } else {
         0
     }
+}
+
+#[allow(clippy::as_conversions)]
+pub fn ptr_addr<T>(p: *const T) -> usize {
+    p as usize
+}
+
+#[allow(clippy::as_conversions)]
+pub fn ptr_as_mut<T>(p: *const T) -> *mut T {
+    p as *mut T
+}
+
+#[allow(clippy::as_conversions)]
+pub fn usize_to_void_ptr(val: usize) -> *mut c_void {
+    val as *mut c_void
+}
+
+#[allow(clippy::as_conversions)]
+pub fn void_ptr_to_usize(p: *mut c_void) -> usize {
+    p as usize
 }

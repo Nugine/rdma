@@ -3,7 +3,7 @@ use crate::ctx::Context;
 use crate::error::create_resource;
 use crate::pd::ProtectionDomain;
 use crate::resource::Resource;
-use crate::utils::{bool_to_c_int, c_uint_to_u32};
+use crate::utils::{bool_to_c_int, c_uint_to_u32, usize_to_void_ptr, void_ptr_to_usize};
 
 use rdma_sys::IBV_QP_INIT_ATTR_PD;
 use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp};
@@ -46,14 +46,12 @@ impl QueuePair {
         QueuePairId(unsafe { (*qp).qp_num })
     }
 
-    // FIXME: clippy false positive: https://github.com/rust-lang/rust-clippy/issues/8622
-    #[allow(clippy::transmutes_expressible_as_ptr_casts)]
     #[inline]
     #[must_use]
     pub fn user_data(&self) -> usize {
         let qp = self.ffi_ptr();
         // SAFETY: reading a immutable field of a concurrent ffi type
-        unsafe { mem::transmute((*qp).qp_context) }
+        unsafe { void_ptr_to_usize((*qp).qp_context) }
     }
 }
 
@@ -94,7 +92,7 @@ impl Inner {
             let context = ctx.ffi_ptr();
 
             let mut qp_attr: ibv_qp_init_attr_ex = mem::zeroed();
-            qp_attr.qp_context = mem::transmute(options.user_data);
+            qp_attr.qp_context = usize_to_void_ptr(options.user_data);
             if let Some(ref send_cq) = options.send_cq {
                 qp_attr.send_cq = ibv_cq_ex_to_cq(send_cq.ffi_ptr());
             }

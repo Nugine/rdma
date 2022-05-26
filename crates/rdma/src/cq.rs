@@ -2,7 +2,7 @@ use crate::cc::CompChannel;
 use crate::ctx::Context;
 use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
-use crate::utils::bool_to_c_int;
+use crate::utils::{bool_to_c_int, ptr_as_mut, usize_to_void_ptr};
 
 use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
 use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
@@ -46,7 +46,7 @@ impl CompletionQueue {
         unsafe {
             let cq: *mut ibv_cq_ex = inner.cq.as_ptr().cast();
             let inner_ptr: *const Inner = &*inner;
-            (*cq).cq_context = mem::transmute(inner_ptr);
+            (*cq).cq_context = ptr_as_mut(inner_ptr).cast();
         };
         Ok(Self(inner))
     }
@@ -112,7 +112,7 @@ impl Inner {
 
             let mut cq_attr: ibv_cq_init_attr_ex = mem::zeroed();
             cq_attr.cqe = options.cqe.numeric_cast();
-            cq_attr.cq_context = mem::transmute(options.user_data);
+            cq_attr.cq_context = usize_to_void_ptr(options.user_data);
 
             if let Some(ref cc) = options.channel {
                 cq_attr.channel = cc.ffi_ptr();
