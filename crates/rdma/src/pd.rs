@@ -1,4 +1,4 @@
-use crate::ctx::Context;
+use crate::ctx::{self, Context};
 use crate::error::create_resource;
 use crate::resource::Resource;
 
@@ -11,20 +11,20 @@ use std::sync::Arc;
 
 pub struct ProtectionDomain(Arc<Owner>);
 
-/// SAFETY: shared resource type
+/// SAFETY: resource type
 unsafe impl Resource for ProtectionDomain {
-    type Ctype = ibv_pd;
+    type Owner = Owner;
 
-    fn ffi_ptr(&self) -> *mut Self::Ctype {
-        self.0.pd.as_ptr()
-    }
-
-    fn strong_ref(&self) -> Self {
-        Self(Arc::clone(&self.0))
+    fn as_owner(&self) -> &Arc<Self::Owner> {
+        &self.0
     }
 }
 
 impl ProtectionDomain {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_pd {
+        self.0.ffi_ptr()
+    }
+
     #[inline]
     pub fn alloc(ctx: &Context) -> io::Result<Self> {
         let owner = Owner::alloc(ctx)?;
@@ -32,10 +32,10 @@ impl ProtectionDomain {
     }
 }
 
-struct Owner {
+pub(crate) struct Owner {
     pd: NonNull<ibv_pd>,
 
-    _ctx: Context,
+    _ctx: Arc<ctx::Owner>,
 }
 
 /// SAFETY: owned type
@@ -44,6 +44,10 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_pd {
+        self.pd.as_ptr()
+    }
+
     fn alloc(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -62,7 +66,10 @@ impl Owner {
 impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
-        let ret = unsafe { ibv_dealloc_pd(self.pd.as_ptr()) };
-        assert_eq!(ret, 0);
+        unsafe {
+            let pd = self.ffi_ptr();
+            let ret = ibv_dealloc_pd(pd);
+            assert_eq!(ret, 0);
+        }
     }
 }

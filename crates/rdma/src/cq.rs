@@ -1,38 +1,36 @@
-use crate::cc::CompChannel;
-use crate::ctx::Context;
+use crate::cc::{self, CompChannel};
+use crate::ctx::{self, Context};
 use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
-use crate::utils::{bool_to_c_int, ptr_as_mut, usize_to_void_ptr};
+use crate::utils::{bool_to_c_int, usize_to_void_ptr};
 
 use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
 use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
 
 use std::cell::UnsafeCell;
 use std::io;
-use std::mem::{self, ManuallyDrop};
-use std::os::raw::c_void;
-use std::pin::Pin;
+use std::mem;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
 use numeric_cast::NumericCast;
 
-pub struct CompletionQueue(Pin<Arc<Owner>>);
+pub struct CompletionQueue(Arc<Owner>);
 
-/// SAFETY: shared resource type
+/// SAFETY: resource type
 unsafe impl Resource for CompletionQueue {
-    type Ctype = ibv_cq_ex;
+    type Owner = Owner;
 
-    fn ffi_ptr(&self) -> *mut Self::Ctype {
-        self.0.cq.as_ptr().cast()
-    }
-
-    fn strong_ref(&self) -> Self {
-        Self(Pin::clone(&self.0))
+    fn as_owner(&self) -> &Arc<Self::Owner> {
+        &self.0
     }
 }
 
 impl CompletionQueue {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_cq_ex {
+        self.0.ffi_ptr()
+    }
+
     #[inline]
     #[must_use]
     pub fn options() -> CompletionQueueOptions {
@@ -41,13 +39,7 @@ impl CompletionQueue {
 
     #[inline]
     pub fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
-        let owner = Arc::pin(Owner::create(ctx, options)?);
-        // SAFETY: setup self-reference in cq_context
-        unsafe {
-            let cq: *mut ibv_cq_ex = owner.cq.as_ptr().cast();
-            let owner_ptr: *const Owner = &*owner;
-            (*cq).cq_context = ptr_as_mut(owner_ptr).cast();
-        };
+        let owner = Arc::new(Owner::create(ctx, options)?);
         Ok(Self(owner))
     }
 
@@ -55,15 +47,6 @@ impl CompletionQueue {
     #[must_use]
     pub fn user_data(&self) -> usize {
         self.0.user_data
-    }
-
-    /// SAFETY:
-    /// 1. `cq_context` must come from `CompletionQueue::ffi_ptr`
-    /// 2. the completion queue must be alive when calling this method
-    pub(crate) unsafe fn from_cq_context(cq_context: *mut c_void) -> Self {
-        let owner_ptr: *const Owner = cq_context.cast();
-        let owner = ManuallyDrop::new(Arc::from_raw(owner_ptr));
-        Self(Pin::new(Arc::clone(&owner)))
     }
 
     fn req_notify(&self, solicited_only: bool) -> io::Result<()> {
@@ -90,12 +73,12 @@ impl CompletionQueue {
     }
 }
 
-struct Owner {
+pub(crate) struct Owner {
     cq: NonNull<UnsafeCell<ibv_cq>>,
     user_data: usize,
 
-    _ctx: Context,
-    _cc: Option<CompChannel>,
+    _ctx: Arc<ctx::Owner>,
+    _cc: Option<Arc<cc::Owner>>,
 }
 
 /// SAFETY: owned type
@@ -104,6 +87,10 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_cq_ex {
+        self.cq.as_ptr().cast()
+    }
+
     // TODO: comp vector
     fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
         // SAFETY: ffi
@@ -137,7 +124,7 @@ impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {
-            let cq: *mut ibv_cq_ex = self.cq.as_ptr().cast();
+            let cq = self.ffi_ptr();
             let ret = ibv_destroy_cq(ibv_cq_ex_to_cq(cq));
             assert_eq!(ret, 0);
         };
@@ -148,7 +135,7 @@ impl Drop for Owner {
 pub struct CompletionQueueOptions {
     cqe: usize,
     user_data: usize,
-    channel: Option<CompChannel>,
+    channel: Option<Arc<cc::Owner>>,
 }
 
 impl CompletionQueueOptions {

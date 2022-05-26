@@ -24,6 +24,7 @@
 )]
 
 mod error;
+#[macro_use]
 mod resource;
 mod utils;
 mod weakset;

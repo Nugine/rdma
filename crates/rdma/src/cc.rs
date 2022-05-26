@@ -1,4 +1,4 @@
-use crate::ctx::Context;
+use crate::ctx::{self, Context};
 use crate::error::create_resource;
 use crate::resource::Resource;
 
@@ -12,20 +12,20 @@ use std::sync::Arc;
 
 pub struct CompChannel(Arc<Owner>);
 
-/// SAFETY: shared resource type
+/// SAFETY: resource type
 unsafe impl Resource for CompChannel {
-    type Ctype = ibv_comp_channel;
+    type Owner = Owner;
 
-    fn ffi_ptr(&self) -> *mut Self::Ctype {
-        self.0.cc.as_ptr()
-    }
-
-    fn strong_ref(&self) -> Self {
-        Self(Arc::clone(&self.0))
+    fn as_owner(&self) -> &Arc<Self::Owner> {
+        &self.0
     }
 }
 
 impl CompChannel {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_comp_channel {
+        self.0.ffi_ptr()
+    }
+
     #[inline]
     pub fn create(ctx: &Context) -> io::Result<Self> {
         let owner = Owner::create(ctx)?;
@@ -42,10 +42,10 @@ impl AsRawFd for CompChannel {
     }
 }
 
-struct Owner {
+pub(crate) struct Owner {
     cc: NonNull<ibv_comp_channel>,
 
-    _ctx: Context,
+    _ctx: Arc<ctx::Owner>,
 }
 
 /// SAFETY: owned type
@@ -54,6 +54,10 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_comp_channel {
+        self.cc.as_ptr()
+    }
+
     fn create(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -73,7 +77,10 @@ impl Owner {
 impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
-        let ret = unsafe { ibv_destroy_comp_channel(self.cc.as_ptr()) };
-        assert_eq!(ret, 0);
+        unsafe {
+            let cc = self.ffi_ptr();
+            let ret = ibv_destroy_comp_channel(cc);
+            assert_eq!(ret, 0);
+        }
     }
 }

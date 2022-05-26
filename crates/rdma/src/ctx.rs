@@ -19,20 +19,20 @@ use std::sync::Arc;
 
 pub struct Context(Arc<Owner>);
 
-/// SAFETY: shared resource type
+/// SAFETY: resource type
 unsafe impl Resource for Context {
-    type Ctype = ibv_context;
+    type Owner = Owner;
 
-    fn ffi_ptr(&self) -> *mut Self::Ctype {
-        self.0.ctx.as_ptr().cast()
-    }
-
-    fn strong_ref(&self) -> Self {
-        Self(Arc::clone(&self.0))
+    fn as_owner(&self) -> &Arc<Self::Owner> {
+        &self.0
     }
 }
 
 impl Context {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_context {
+        self.0.ffi_ptr()
+    }
+
     #[inline]
     pub fn open(device: &Device) -> io::Result<Self> {
         let owner = Owner::open(device)?;
@@ -85,6 +85,10 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
+    fn ffi_ptr(&self) -> *mut ibv_context {
+        self.ctx.as_ptr().cast()
+    }
+
     fn open(device: &Device) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -101,7 +105,7 @@ impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {
-            let context: *mut ibv_context = self.ctx.as_ptr().cast();
+            let context = self.ffi_ptr();
             let ret = ibv_close_device(context);
             assert_eq!(ret, 0);
         }

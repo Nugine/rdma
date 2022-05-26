@@ -1,7 +1,7 @@
-use crate::cq::CompletionQueue;
-use crate::ctx::Context;
+use crate::cq::{self, CompletionQueue};
+use crate::ctx::{self, Context};
 use crate::error::create_resource;
-use crate::pd::ProtectionDomain;
+use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, c_uint_to_u32, usize_to_void_ptr, void_ptr_to_usize};
 
@@ -25,7 +25,20 @@ use std::{io, mem};
 
 pub struct QueuePair(Arc<Owner>);
 
+/// SAFETY: resource type
+unsafe impl Resource for QueuePair {
+    type Owner = Owner;
+
+    fn as_owner(&self) -> &Arc<Self::Owner> {
+        &self.0
+    }
+}
+
 impl QueuePair {
+    pub(crate) fn ffi_ptr(&self) -> *mut ibv_qp {
+        self.0.ffi_ptr()
+    }
+
     #[inline]
     #[must_use]
     pub fn options() -> QueuePairOptions {
@@ -55,26 +68,13 @@ impl QueuePair {
     }
 }
 
-/// SAFETY: shared resource type
-unsafe impl Resource for QueuePair {
-    type Ctype = ibv_qp;
-
-    fn ffi_ptr(&self) -> *mut Self::Ctype {
-        self.0.qp.as_ptr().cast()
-    }
-
-    fn strong_ref(&self) -> Self {
-        Self(Arc::clone(&self.0))
-    }
-}
-
-struct Owner {
+pub(crate) struct Owner {
     qp: NonNull<UnsafeCell<ibv_qp>>,
 
-    _ctx: Context,
-    _pd: Option<ProtectionDomain>,
-    _send_cq: Option<CompletionQueue>,
-    _recv_cq: Option<CompletionQueue>,
+    _ctx: Arc<ctx::Owner>,
+    _pd: Option<Arc<pd::Owner>>,
+    _send_cq: Option<Arc<cq::Owner>>,
+    _recv_cq: Option<Arc<cq::Owner>>,
 }
 
 /// SAFETY: owned type
@@ -83,6 +83,10 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
+    fn ffi_ptr(&self) -> *mut ibv_qp {
+        self.qp.as_ptr().cast()
+    }
+
     fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
         assert!(options.pd.is_some(), "pd is required");
         assert!(options.qp_type.is_some(), "qp_type is required");
@@ -134,12 +138,12 @@ impl Drop for Owner {
 
 pub struct QueuePairOptions {
     user_data: usize,
-    send_cq: Option<CompletionQueue>,
-    recv_cq: Option<CompletionQueue>,
+    send_cq: Option<Arc<cq::Owner>>,
+    recv_cq: Option<Arc<cq::Owner>>,
     qp_type: Option<QueuePairType>,
     sq_sig_all: Option<bool>,
     cap: ibv_qp_cap,
-    pd: Option<ProtectionDomain>,
+    pd: Option<Arc<pd::Owner>>,
 }
 
 impl Default for QueuePairOptions {
