@@ -7,6 +7,7 @@ use rdma_sys::ibv_comp_channel;
 use rdma_sys::{ibv_create_comp_channel, ibv_destroy_comp_channel};
 
 use std::io;
+use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::ptr::NonNull;
 
 use asc::Asc;
@@ -19,6 +20,15 @@ impl CompChannel {
     pub fn create(ctx: &Context) -> io::Result<Self> {
         let owner = CompChannelOwner::create(ctx)?;
         Ok(Self(Resource::new(owner)))
+    }
+}
+
+impl AsRawFd for CompChannel {
+    #[inline]
+    fn as_raw_fd(&self) -> RawFd {
+        let cc = self.0.ctype();
+        // SAFETY: reading a immutable field of a concurrent ffi type
+        unsafe { (*cc).fd }
     }
 }
 
