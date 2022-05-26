@@ -177,3 +177,9 @@ pub unsafe fn ibv_create_qp_ex(
     let op = (*vctx).create_qp_ex.unwrap_unchecked();
     (op)(context, qp_attr)
 }
+
+pub unsafe fn ibv_req_notify_cq(cq: *mut ibv_cq, solicited_only: c_int) -> c_int {
+    let ctx: *mut ibv_context = (*cq).context;
+    let op: _ = (*ctx).ops.req_notify_cq.unwrap_unchecked();
+    (op)(cq, solicited_only)
+}
