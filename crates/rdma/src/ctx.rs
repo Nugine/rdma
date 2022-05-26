@@ -2,7 +2,6 @@ use crate::error::create_resource;
 use crate::query::DeviceAttr;
 use crate::query::PortAttr;
 use crate::resource::Resource;
-use crate::resource::ResourceOwner;
 use crate::CompChannel;
 use crate::CompletionQueue;
 use crate::CompletionQueueOptions;
@@ -19,14 +18,29 @@ use std::cell::UnsafeCell;
 use std::io;
 use std::ptr::NonNull;
 
+use asc::Asc;
+
 #[derive(Clone)]
-pub struct Context(pub(crate) Resource<ContextOwner>);
+pub struct Context(Asc<Inner>);
+
+/// SAFETY: shared resource type
+unsafe impl Resource for Context {
+    type Ctype = ibv_context;
+
+    fn ffi_ptr(&self) -> *mut Self::Ctype {
+        self.0.ctx.as_ptr().cast()
+    }
+
+    fn strong_ref(&self) -> Self {
+        Self(Asc::clone(&self.0))
+    }
+}
 
 impl Context {
     #[inline]
     pub fn open(device: &Device) -> io::Result<Self> {
-        let owner = ContextOwner::open(device)?;
-        Ok(Self(Resource::new(owner)))
+        let inner = Inner::open(device)?;
+        Ok(Self(Asc::new(inner)))
     }
 
     #[inline]
@@ -65,25 +79,16 @@ impl Context {
     }
 }
 
-pub(crate) struct ContextOwner {
+pub(crate) struct Inner {
     ctx: NonNull<UnsafeCell<ibv_context>>,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for ContextOwner {}
+unsafe impl Send for Inner {}
 /// SAFETY: owned type
-unsafe impl Sync for ContextOwner {}
+unsafe impl Sync for Inner {}
 
-/// SAFETY: resource owner
-unsafe impl ResourceOwner for ContextOwner {
-    type Ctype = ibv_context;
-
-    fn ctype(&self) -> *mut Self::Ctype {
-        self.ctx.as_ptr().cast()
-    }
-}
-
-impl ContextOwner {
+impl Inner {
     fn open(device: &Device) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
@@ -96,23 +101,13 @@ impl ContextOwner {
     }
 }
 
-impl Drop for ContextOwner {
+impl Drop for Inner {
     fn drop(&mut self) {
         // SAFETY: ffi
-        let ret = unsafe { ibv_close_device(self.ctype()) };
-        assert_eq!(ret, 0);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::utils::require_send_sync;
-
-    #[test]
-    fn marker() {
-        require_send_sync::<Context>();
-        require_send_sync::<ContextOwner>();
+        unsafe {
+            let context: *mut ibv_context = self.ctx.as_ptr().cast();
+            let ret = ibv_close_device(context);
+            assert_eq!(ret, 0);
+        }
     }
 }

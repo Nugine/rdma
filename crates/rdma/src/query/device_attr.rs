@@ -1,4 +1,5 @@
 use crate::error::from_errno;
+use crate::resource::Resource;
 use crate::utils::{box_assume_init, box_new_uninit};
 use crate::Context;
 
@@ -16,7 +17,7 @@ impl DeviceAttr {
         // SAFETY: ffi
         unsafe {
             let mut device_attr = box_new_uninit::<ibv_device_attr_ex>();
-            let context = ctx.0.ffi_ptr();
+            let context = ctx.ffi_ptr();
             let input = ptr::null();
             let ret = ibv_query_device_ex(context, input, device_attr.as_mut_ptr());
             if ret != 0 {

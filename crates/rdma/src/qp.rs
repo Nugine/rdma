@@ -1,9 +1,9 @@
 use crate::error::create_resource;
-use crate::resource::{Resource, ResourceOwner};
+use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, c_uint_to_u32};
-use crate::{CompletionQueue, CompletionQueueOwner};
-use crate::{Context, ContextOwner};
-use crate::{ProtectionDomain, ProtectionDomainOwner};
+use crate::CompletionQueue;
+use crate::Context;
+use crate::ProtectionDomain;
 
 use rdma_sys::IBV_QP_INIT_ATTR_PD;
 use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp};
@@ -25,7 +25,7 @@ use std::{io, mem};
 use asc::Asc;
 
 #[derive(Clone)]
-pub struct QueuePair(pub(crate) Resource<QueuePairOwner>);
+pub struct QueuePair(Asc<Inner>);
 
 impl QueuePair {
     #[inline]
@@ -36,14 +36,14 @@ impl QueuePair {
 
     #[inline]
     pub fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
-        let owner = QueuePairOwner::create(ctx, options)?;
-        Ok(Self(Resource::new(owner)))
+        let inner = Inner::create(ctx, options)?;
+        Ok(Self(Asc::new(inner)))
     }
 
     #[inline]
     #[must_use]
     pub fn id(&self) -> QueuePairId {
-        let qp = self.0.ctype();
+        let qp = self.ffi_ptr();
         // SAFETY: reading a immutable field of a concurrent ffi type
         QueuePairId(unsafe { (*qp).qp_num })
     }
@@ -53,41 +53,97 @@ impl QueuePair {
     #[inline]
     #[must_use]
     pub fn user_data(&self) -> usize {
-        let qp = self.0.ctype();
+        let qp = self.ffi_ptr();
         // SAFETY: reading a immutable field of a concurrent ffi type
         unsafe { mem::transmute((*qp).qp_context) }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct QueuePairId(u32);
+/// SAFETY: shared resource type
+unsafe impl Resource for QueuePair {
+    type Ctype = ibv_qp;
 
-#[derive(Debug, Clone, Copy)]
-#[repr(u32)]
-pub enum QueuePairType {
-    RC = c_uint_to_u32(IBV_QPT_RC),
-    UC = c_uint_to_u32(IBV_QPT_UC),
-    UD = c_uint_to_u32(IBV_QPT_UD),
-    Driver = c_uint_to_u32(IBV_QPT_DRIVER),
-    XrcRecv = c_uint_to_u32(IBV_QPT_XRC_RECV),
-    XrcSend = c_uint_to_u32(IBV_QPT_XRC_SEND),
+    fn ffi_ptr(&self) -> *mut Self::Ctype {
+        self.0.qp.as_ptr().cast()
+    }
+
+    fn strong_ref(&self) -> Self {
+        Self(Asc::clone(&self.0))
+    }
 }
 
-impl QueuePairType {
-    #[allow(clippy::as_conversions)]
-    fn to_c_uint(self) -> c_uint {
-        self as u32 as c_uint
+struct Inner {
+    qp: NonNull<UnsafeCell<ibv_qp>>,
+
+    _ctx: Context,
+    _pd: Option<ProtectionDomain>,
+    _send_cq: Option<CompletionQueue>,
+    _recv_cq: Option<CompletionQueue>,
+}
+
+/// SAFETY: owned type
+unsafe impl Send for Inner {}
+/// SAFETY: owned type
+unsafe impl Sync for Inner {}
+
+impl Inner {
+    fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
+        assert!(options.pd.is_some(), "pd is required");
+        assert!(options.qp_type.is_some(), "qp_type is required");
+        assert!(options.sq_sig_all.is_some(), "sq_sig_all is required");
+        // SAFETY: ffi
+        unsafe {
+            let context = ctx.ffi_ptr();
+
+            let mut qp_attr: ibv_qp_init_attr_ex = mem::zeroed();
+            qp_attr.qp_context = mem::transmute(options.user_data);
+            if let Some(ref send_cq) = options.send_cq {
+                qp_attr.send_cq = ibv_cq_ex_to_cq(send_cq.ffi_ptr());
+            }
+            if let Some(ref recv_cq) = options.recv_cq {
+                qp_attr.recv_cq = ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
+            }
+            qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
+            qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
+            qp_attr.cap = options.cap;
+            qp_attr.pd = options.pd.as_ref().unwrap_unchecked().ffi_ptr();
+            qp_attr.comp_mask = IBV_QP_INIT_ATTR_PD;
+
+            let qp = create_resource(
+                || ibv_create_qp_ex(context, &mut qp_attr),
+                || "failed to create queue pair",
+            )?;
+
+            Ok(Self {
+                qp: qp.cast(),
+                _ctx: ctx.strong_ref(),
+                _pd: options.pd,
+                _send_cq: options.send_cq,
+                _recv_cq: options.recv_cq,
+            })
+        }
+    }
+}
+
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // SAFETY: ffi
+        unsafe {
+            let qp: *mut ibv_qp = self.qp.as_ptr().cast();
+            let ret = ibv_destroy_qp(qp);
+            assert_eq!(ret, 0);
+        }
     }
 }
 
 pub struct QueuePairOptions {
     user_data: usize,
-    send_cq: Option<Asc<CompletionQueueOwner>>,
-    recv_cq: Option<Asc<CompletionQueueOwner>>,
+    send_cq: Option<CompletionQueue>,
+    recv_cq: Option<CompletionQueue>,
     qp_type: Option<QueuePairType>,
     sq_sig_all: Option<bool>,
     cap: ibv_qp_cap,
-    pd: Option<Asc<ProtectionDomainOwner>>,
+    pd: Option<ProtectionDomain>,
 }
 
 impl Default for QueuePairOptions {
@@ -114,12 +170,12 @@ impl QueuePairOptions {
     }
     #[inline]
     pub fn send_cq(&mut self, send_cq: &CompletionQueue) -> &mut Self {
-        self.send_cq = Some(send_cq.0.strong_ref());
+        self.send_cq = Some(send_cq.strong_ref());
         self
     }
     #[inline]
     pub fn recv_cq(&mut self, recv_cq: &CompletionQueue) -> &mut Self {
-        self.recv_cq = Some(recv_cq.0.strong_ref());
+        self.recv_cq = Some(recv_cq.strong_ref());
         self
     }
     #[inline]
@@ -134,7 +190,7 @@ impl QueuePairOptions {
     }
     #[inline]
     pub fn pd(&mut self, pd: &ProtectionDomain) -> &mut Self {
-        self.pd = Some(pd.0.strong_ref());
+        self.pd = Some(pd.strong_ref());
         self
     }
     #[inline]
@@ -164,72 +220,23 @@ impl QueuePairOptions {
     }
 }
 
-pub(crate) struct QueuePairOwner {
-    qp: NonNull<UnsafeCell<ibv_qp>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct QueuePairId(u32);
 
-    _ctx: Asc<ContextOwner>,
-    _pd: Option<Asc<ProtectionDomainOwner>>,
-    _send_cq: Option<Asc<CompletionQueueOwner>>,
-    _recv_cq: Option<Asc<CompletionQueueOwner>>,
+#[derive(Debug, Clone, Copy)]
+#[repr(u32)]
+pub enum QueuePairType {
+    RC = c_uint_to_u32(IBV_QPT_RC),
+    UC = c_uint_to_u32(IBV_QPT_UC),
+    UD = c_uint_to_u32(IBV_QPT_UD),
+    Driver = c_uint_to_u32(IBV_QPT_DRIVER),
+    XrcRecv = c_uint_to_u32(IBV_QPT_XRC_RECV),
+    XrcSend = c_uint_to_u32(IBV_QPT_XRC_SEND),
 }
 
-/// SAFETY: owned type
-unsafe impl Send for QueuePairOwner {}
-/// SAFETY: owned type
-unsafe impl Sync for QueuePairOwner {}
-
-/// SAFETY: resource owner
-unsafe impl ResourceOwner for QueuePairOwner {
-    type Ctype = ibv_qp;
-
-    fn ctype(&self) -> *mut Self::Ctype {
-        self.qp.as_ptr().cast()
-    }
-}
-
-impl QueuePairOwner {
-    fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
-        assert!(options.pd.is_some(), "pd is required");
-        assert!(options.qp_type.is_some(), "qp_type is required");
-        assert!(options.sq_sig_all.is_some(), "sq_sig_all is required");
-        // SAFETY: ffi
-        unsafe {
-            let context = ctx.0.ffi_ptr();
-
-            let mut qp_attr: ibv_qp_init_attr_ex = mem::zeroed();
-            qp_attr.qp_context = mem::transmute(options.user_data);
-            if let Some(ref send_cq) = options.send_cq {
-                qp_attr.send_cq = ibv_cq_ex_to_cq(send_cq.ctype());
-            }
-            if let Some(ref recv_cq) = options.recv_cq {
-                qp_attr.recv_cq = ibv_cq_ex_to_cq(recv_cq.ctype());
-            }
-            qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
-            qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
-            qp_attr.cap = options.cap;
-            qp_attr.pd = options.pd.as_ref().unwrap_unchecked().ctype();
-            qp_attr.comp_mask = IBV_QP_INIT_ATTR_PD;
-
-            let qp = create_resource(
-                || ibv_create_qp_ex(context, &mut qp_attr),
-                || "failed to create queue pair",
-            )?;
-
-            Ok(Self {
-                qp: qp.cast(),
-                _ctx: ctx.0.strong_ref(),
-                _pd: options.pd,
-                _send_cq: options.send_cq,
-                _recv_cq: options.recv_cq,
-            })
-        }
-    }
-}
-
-impl Drop for QueuePairOwner {
-    fn drop(&mut self) {
-        // SAFETY: ffi
-        let ret = unsafe { ibv_destroy_qp(self.ctype()) };
-        assert_eq!(ret, 0);
+impl QueuePairType {
+    #[allow(clippy::as_conversions)]
+    fn to_c_uint(self) -> c_uint {
+        self as u32 as c_uint
     }
 }

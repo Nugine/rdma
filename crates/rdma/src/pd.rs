@@ -1,7 +1,5 @@
-use crate::ctx::ContextOwner;
 use crate::error::create_resource;
 use crate::resource::Resource;
-use crate::resource::ResourceOwner;
 use crate::Context;
 
 use rdma_sys::ibv_pd;
@@ -12,70 +10,60 @@ use std::ptr::NonNull;
 
 use asc::Asc;
 
-#[derive(Clone)]
-pub struct ProtectionDomain(pub(crate) Resource<ProtectionDomainOwner>);
+pub struct ProtectionDomain(Asc<Inner>);
+
+/// SAFETY: shared resource type
+unsafe impl Resource for ProtectionDomain {
+    type Ctype = ibv_pd;
+
+    fn ffi_ptr(&self) -> *mut Self::Ctype {
+        self.0.pd.as_ptr()
+    }
+
+    fn strong_ref(&self) -> Self {
+        Self(Asc::clone(&self.0))
+    }
+}
 
 impl ProtectionDomain {
     #[inline]
     pub fn alloc(ctx: &Context) -> io::Result<Self> {
-        let owner = ProtectionDomainOwner::alloc(ctx)?;
-        Ok(Self(Resource::new(owner)))
+        let inner = Inner::alloc(ctx)?;
+        Ok(Self(Asc::new(inner)))
     }
 }
 
-pub(crate) struct ProtectionDomainOwner {
+struct Inner {
     pd: NonNull<ibv_pd>,
 
-    _ctx: Asc<ContextOwner>,
+    _ctx: Context,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for ProtectionDomainOwner {}
+unsafe impl Send for Inner {}
 /// SAFETY: owned type
-unsafe impl Sync for ProtectionDomainOwner {}
+unsafe impl Sync for Inner {}
 
-/// SAFETY: resource owner
-unsafe impl ResourceOwner for ProtectionDomainOwner {
-    type Ctype = ibv_pd;
-
-    fn ctype(&self) -> *mut Self::Ctype {
-        self.pd.as_ptr()
-    }
-}
-
-impl ProtectionDomainOwner {
+impl Inner {
     fn alloc(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
             let pd = create_resource(
-                || ibv_alloc_pd(ctx.0.ffi_ptr()),
+                || ibv_alloc_pd(ctx.ffi_ptr()),
                 || "failed to allocate protection domain",
             )?;
             Ok(Self {
                 pd,
-                _ctx: ctx.0.strong_ref(),
+                _ctx: ctx.strong_ref(),
             })
         }
     }
 }
 
-impl Drop for ProtectionDomainOwner {
+impl Drop for Inner {
     fn drop(&mut self) {
         // SAFETY: ffi
         let ret = unsafe { ibv_dealloc_pd(self.pd.as_ptr()) };
         assert_eq!(ret, 0);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::utils::require_send_sync;
-
-    #[test]
-    fn marker() {
-        require_send_sync::<ProtectionDomain>();
-        require_send_sync::<ProtectionDomainOwner>();
     }
 }

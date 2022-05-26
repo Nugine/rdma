@@ -1,4 +1,5 @@
 use crate::error::custom_error;
+use crate::resource::Resource;
 use crate::utils::c_uint_to_u32;
 use crate::Context;
 
@@ -17,7 +18,7 @@ impl GidEntry {
         // SAFETY: ffi
         unsafe {
             let mut gid = MaybeUninit::<Self>::uninit();
-            let context = ctx.0.ffi_ptr();
+            let context = ctx.ffi_ptr();
             let entry = gid.as_mut_ptr().cast::<ibv_gid_entry>();
             let flags = 0; // ASK: what is this?
             let ret = ibv_query_gid_ex(context, port_num, gid_index, entry, flags);

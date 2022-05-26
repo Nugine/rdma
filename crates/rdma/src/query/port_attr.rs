@@ -1,4 +1,5 @@
 use crate::error::from_errno;
+use crate::resource::Resource;
 use crate::utils::{box_assume_init, box_new_uninit, c_uint_to_u32};
 use crate::Context;
 
@@ -28,7 +29,7 @@ impl PortAttr {
         // SAFETY: ffi
         unsafe {
             let mut port_attr = box_new_uninit::<ibv_port_attr>();
-            let context = ctx.0.ffi_ptr();
+            let context = ctx.ffi_ptr();
             let ret = ibv_query_port(context, port_num, port_attr.as_mut_ptr());
             if ret != 0 {
                 return Err(from_errno(ret));
