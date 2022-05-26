@@ -20,7 +20,6 @@
 #![allow(
     clippy::missing_errors_doc, // TODO
     clippy::missing_docs_in_private_items, // TODO
-    clippy::missing_panics_doc, // TODO
 )]
 
 mod error;

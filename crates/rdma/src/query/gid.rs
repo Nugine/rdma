@@ -1,12 +1,12 @@
 use crate::ctx::Context;
 use crate::error::custom_error;
-use crate::resource::Resource;
 use crate::utils::c_uint_to_u32;
 
 use rdma_sys::{ibv_gid, ibv_gid_entry, ibv_query_gid_ex};
 use rdma_sys::{IBV_GID_TYPE_IB, IBV_GID_TYPE_ROCE_V1, IBV_GID_TYPE_ROCE_V2};
 
 use std::mem::MaybeUninit;
+use std::os::raw::c_uint;
 use std::{fmt, io, slice};
 
 #[repr(transparent)]
@@ -32,12 +32,7 @@ impl GidEntry {
     #[inline]
     #[must_use]
     pub fn gid_type(&self) -> GidType {
-        match self.0.gid_type {
-            IBV_GID_TYPE_IB => GidType::IB,
-            IBV_GID_TYPE_ROCE_V1 => GidType::RoceV1,
-            IBV_GID_TYPE_ROCE_V2 => GidType::RoceV2,
-            _ => panic!("unknown gid type"),
-        }
+        GidType::from_c_uint(self.0.gid_type)
     }
 
     #[inline]
@@ -53,6 +48,17 @@ pub enum GidType {
     IB = c_uint_to_u32(IBV_GID_TYPE_IB),
     RoceV1 = c_uint_to_u32(IBV_GID_TYPE_ROCE_V1),
     RoceV2 = c_uint_to_u32(IBV_GID_TYPE_ROCE_V2),
+}
+
+impl GidType {
+    fn from_c_uint(val: c_uint) -> Self {
+        match val {
+            IBV_GID_TYPE_IB => GidType::IB,
+            IBV_GID_TYPE_ROCE_V1 => GidType::RoceV1,
+            IBV_GID_TYPE_ROCE_V2 => GidType::RoceV2,
+            _ => panic!("unknown gid type"),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

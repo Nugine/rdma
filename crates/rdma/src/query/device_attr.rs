@@ -1,6 +1,5 @@
 use crate::ctx::Context;
 use crate::error::from_errno;
-use crate::resource::Resource;
 use crate::utils::{box_assume_init, box_new_uninit};
 
 use rdma_sys::ibv_device_attr_ex;

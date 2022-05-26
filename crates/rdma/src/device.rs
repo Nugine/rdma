@@ -48,6 +48,10 @@ impl DeviceList {
     }
 
     /// Returns available rdma devices
+    ///
+    /// # Panics
+    /// + if the number of devices can not be converted to an usize
+    /// + if the total size of the device array is larger than slice size limit
     #[inline]
     pub fn available() -> io::Result<Self> {
         // SAFETY: ffi
