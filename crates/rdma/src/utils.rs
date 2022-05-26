@@ -39,8 +39,13 @@ pub const fn bool_to_c_int(b: bool) -> c_int {
 }
 
 #[allow(clippy::as_conversions)]
-pub fn ptr_addr<T>(p: *const T) -> usize {
+pub fn ptr_to_addr<T>(p: *const T) -> usize {
     p as usize
+}
+
+#[allow(clippy::as_conversions)]
+pub fn ptr_from_addr<T>(val: usize) -> *const T {
+    val as *const T
 }
 
 #[allow(clippy::as_conversions)]

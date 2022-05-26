@@ -26,6 +26,7 @@
 mod error;
 mod resource;
 mod utils;
+mod weakset;
 
 pub mod cc;
 pub mod cq;
