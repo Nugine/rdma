@@ -4,14 +4,16 @@ use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, ptr_as_mut};
 
-use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
+use rdma_sys::{ibv_ack_cq_events, ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
 use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
 
 use std::cell::UnsafeCell;
 use std::io;
 use std::mem::{self, ManuallyDrop};
-use std::os::raw::c_void;
+use std::os::raw::{c_uint, c_void};
 use std::ptr::NonNull;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Weak};
 
 use numeric_cast::NumericCast;
@@ -60,6 +62,7 @@ impl CompletionQueue {
             Arc::new(Owner {
                 cq: cq.cast(),
                 user_data: options.user_data,
+                comp_events_completed: AtomicU32::new(0),
                 _ctx: ctx.strong_ref(),
                 cc: options.channel,
             })
@@ -120,11 +123,17 @@ impl CompletionQueue {
     pub fn req_notify_solicited(&self) -> io::Result<()> {
         self.req_notify(true)
     }
+
+    #[inline]
+    pub fn ack_cq_events(&self, cnt: u32) {
+        self.0.comp_events_completed.fetch_add(cnt, Relaxed);
+    }
 }
 
 pub(crate) struct Owner {
     cq: NonNull<UnsafeCell<ibv_cq>>,
     user_data: usize,
+    comp_events_completed: AtomicU32,
 
     cc: Option<Arc<cc::Owner>>,
     _ctx: Arc<ctx::Owner>,
@@ -149,8 +158,13 @@ impl Drop for Owner {
 
         // SAFETY: ffi
         unsafe {
-            let cq = self.ffi_ptr();
-            let ret = ibv_destroy_cq(ibv_cq_ex_to_cq(cq));
+            let cq = ibv_cq_ex_to_cq(self.ffi_ptr());
+
+            let comp_ack: c_uint = self.comp_events_completed.load(Relaxed).numeric_cast();
+            // if the number overflows, the behavior is unspecified
+            ibv_ack_cq_events(cq, comp_ack);
+
+            let ret = ibv_destroy_cq(cq);
             assert_eq!(ret, 0);
         };
     }
