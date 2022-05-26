@@ -28,8 +28,19 @@ impl CompChannel {
 
     #[inline]
     pub fn create(ctx: &Context) -> io::Result<Self> {
-        let owner = Owner::create(ctx)?;
-        Ok(Self(Arc::new(owner)))
+        // SAFETY: ffi
+        let owner = unsafe {
+            let cc = create_resource(
+                || ibv_create_comp_channel(ctx.ffi_ptr()),
+                || "failed to create completion channel",
+            )?;
+
+            Arc::new(Owner {
+                cc,
+                _ctx: ctx.strong_ref(),
+            })
+        };
+        Ok(Self(owner))
     }
 }
 
@@ -56,21 +67,6 @@ unsafe impl Sync for Owner {}
 impl Owner {
     pub(crate) fn ffi_ptr(&self) -> *mut ibv_comp_channel {
         self.cc.as_ptr()
-    }
-
-    fn create(ctx: &Context) -> io::Result<Self> {
-        // SAFETY: ffi
-        unsafe {
-            let cc = create_resource(
-                || ibv_create_comp_channel(ctx.ffi_ptr()),
-                || "failed to create completion channel",
-            )?;
-
-            Ok(Self {
-                cc,
-                _ctx: ctx.strong_ref(),
-            })
-        }
     }
 }
 

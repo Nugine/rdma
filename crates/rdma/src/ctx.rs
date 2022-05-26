@@ -35,8 +35,15 @@ impl Context {
 
     #[inline]
     pub fn open(device: &Device) -> io::Result<Self> {
-        let owner = Owner::open(device)?;
-        Ok(Self(Arc::new(owner)))
+        // SAFETY: ffi
+        let owner = unsafe {
+            let ctx = create_resource(
+                || ibv_open_device(device.ffi_ptr()),
+                || "failed to open device",
+            )?;
+            Arc::new(Owner { ctx: ctx.cast() })
+        };
+        Ok(Self(owner))
     }
 
     #[inline]
@@ -87,17 +94,6 @@ unsafe impl Sync for Owner {}
 impl Owner {
     fn ffi_ptr(&self) -> *mut ibv_context {
         self.ctx.as_ptr().cast()
-    }
-
-    fn open(device: &Device) -> io::Result<Self> {
-        // SAFETY: ffi
-        unsafe {
-            let ctx = create_resource(
-                || ibv_open_device(device.ffi_ptr()),
-                || "failed to open device",
-            )?;
-            Ok(Self { ctx: ctx.cast() })
-        }
     }
 }
 

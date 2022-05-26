@@ -45,10 +45,47 @@ impl QueuePair {
         QueuePairOptions::default()
     }
 
+    /// # Panics
+    /// 1. if the option `pd` is not set
+    /// 2. if the option `qp_type` is not set
+    /// 3. if the option `sq_sig_all` is not set
     #[inline]
     pub fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
-        let owner = Owner::create(ctx, options)?;
-        Ok(Self(Arc::new(owner)))
+        assert!(options.pd.is_some(), "pd is required");
+        assert!(options.qp_type.is_some(), "qp_type is required");
+        assert!(options.sq_sig_all.is_some(), "sq_sig_all is required");
+        // SAFETY: ffi
+        let owner = unsafe {
+            let context = ctx.ffi_ptr();
+
+            let mut qp_attr: ibv_qp_init_attr_ex = mem::zeroed();
+            qp_attr.qp_context = usize_to_void_ptr(options.user_data);
+            if let Some(ref send_cq) = options.send_cq {
+                qp_attr.send_cq = ibv_cq_ex_to_cq(send_cq.ffi_ptr());
+            }
+            if let Some(ref recv_cq) = options.recv_cq {
+                qp_attr.recv_cq = ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
+            }
+            qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
+            qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
+            qp_attr.cap = options.cap;
+            qp_attr.pd = options.pd.as_ref().unwrap_unchecked().ffi_ptr();
+            qp_attr.comp_mask = IBV_QP_INIT_ATTR_PD;
+
+            let qp = create_resource(
+                || ibv_create_qp_ex(context, &mut qp_attr),
+                || "failed to create queue pair",
+            )?;
+
+            Arc::new(Owner {
+                qp: qp.cast(),
+                _ctx: ctx.strong_ref(),
+                _pd: options.pd,
+                _send_cq: options.send_cq,
+                _recv_cq: options.recv_cq,
+            })
+        };
+        Ok(Self(owner))
     }
 
     #[inline]
@@ -85,43 +122,6 @@ unsafe impl Sync for Owner {}
 impl Owner {
     fn ffi_ptr(&self) -> *mut ibv_qp {
         self.qp.as_ptr().cast()
-    }
-
-    fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
-        assert!(options.pd.is_some(), "pd is required");
-        assert!(options.qp_type.is_some(), "qp_type is required");
-        assert!(options.sq_sig_all.is_some(), "sq_sig_all is required");
-        // SAFETY: ffi
-        unsafe {
-            let context = ctx.ffi_ptr();
-
-            let mut qp_attr: ibv_qp_init_attr_ex = mem::zeroed();
-            qp_attr.qp_context = usize_to_void_ptr(options.user_data);
-            if let Some(ref send_cq) = options.send_cq {
-                qp_attr.send_cq = ibv_cq_ex_to_cq(send_cq.ffi_ptr());
-            }
-            if let Some(ref recv_cq) = options.recv_cq {
-                qp_attr.recv_cq = ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
-            }
-            qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
-            qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
-            qp_attr.cap = options.cap;
-            qp_attr.pd = options.pd.as_ref().unwrap_unchecked().ffi_ptr();
-            qp_attr.comp_mask = IBV_QP_INIT_ATTR_PD;
-
-            let qp = create_resource(
-                || ibv_create_qp_ex(context, &mut qp_attr),
-                || "failed to create queue pair",
-            )?;
-
-            Ok(Self {
-                qp: qp.cast(),
-                _ctx: ctx.strong_ref(),
-                _pd: options.pd,
-                _send_cq: options.send_cq,
-                _recv_cq: options.recv_cq,
-            })
-        }
     }
 }
 

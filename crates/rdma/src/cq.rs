@@ -2,7 +2,7 @@ use crate::cc::{self, CompChannel};
 use crate::ctx::{self, Context};
 use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
-use crate::utils::{bool_to_c_int, ptr_as_mut, usize_to_void_ptr};
+use crate::utils::{bool_to_c_int, ptr_as_mut};
 
 use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
 use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
@@ -40,13 +40,37 @@ impl CompletionQueue {
 
     #[inline]
     pub fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
-        let owner = Arc::new(Owner::create(ctx, options)?);
+        // SAFETY: ffi
+        let owner = unsafe {
+            let context = ctx.ffi_ptr();
+
+            let mut cq_attr: ibv_cq_init_attr_ex = mem::zeroed();
+            cq_attr.cqe = options.cqe.numeric_cast();
+
+            if let Some(ref cc) = options.channel {
+                cq_attr.channel = cc.ffi_ptr();
+            }
+
+            let cq = create_resource(
+                || ibv_create_cq_ex(context, &mut cq_attr),
+                || "failed to create completion queue",
+            )?;
+
+            Arc::new(Owner {
+                cq: cq.cast(),
+                user_data: options.user_data,
+                _ctx: ctx.strong_ref(),
+                _cc: options.channel,
+            })
+        };
+
         // SAFETY: setup self-reference in cq_context
         unsafe {
             let owner_ptr: *const Owner = &*owner;
             let cq = owner.ffi_ptr();
             (*cq).cq_context = ptr_as_mut(owner_ptr).cast();
         }
+
         Ok(Self(owner))
     }
 
@@ -109,34 +133,6 @@ unsafe impl Sync for Owner {}
 impl Owner {
     pub(crate) fn ffi_ptr(&self) -> *mut ibv_cq_ex {
         self.cq.as_ptr().cast()
-    }
-
-    // TODO: comp vector
-    fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
-        // SAFETY: ffi
-        unsafe {
-            let context = ctx.ffi_ptr();
-
-            let mut cq_attr: ibv_cq_init_attr_ex = mem::zeroed();
-            cq_attr.cqe = options.cqe.numeric_cast();
-            cq_attr.cq_context = usize_to_void_ptr(options.user_data);
-
-            if let Some(ref cc) = options.channel {
-                cq_attr.channel = cc.ffi_ptr();
-            }
-
-            let cq = create_resource(
-                || ibv_create_cq_ex(context, &mut cq_attr),
-                || "failed to create completion queue",
-            )?;
-
-            Ok(Self {
-                cq: cq.cast(),
-                user_data: options.user_data,
-                _ctx: ctx.strong_ref(),
-                _cc: options.channel,
-            })
-        }
     }
 }
 

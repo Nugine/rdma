@@ -27,8 +27,18 @@ impl ProtectionDomain {
 
     #[inline]
     pub fn alloc(ctx: &Context) -> io::Result<Self> {
-        let owner = Owner::alloc(ctx)?;
-        Ok(Self(Arc::new(owner)))
+        // SAFETY: ffi
+        let owner = unsafe {
+            let pd = create_resource(
+                || ibv_alloc_pd(ctx.ffi_ptr()),
+                || "failed to allocate protection domain",
+            )?;
+            Arc::new(Owner {
+                pd,
+                _ctx: ctx.strong_ref(),
+            })
+        };
+        Ok(Self(owner))
     }
 }
 
@@ -46,20 +56,6 @@ unsafe impl Sync for Owner {}
 impl Owner {
     pub(crate) fn ffi_ptr(&self) -> *mut ibv_pd {
         self.pd.as_ptr()
-    }
-
-    fn alloc(ctx: &Context) -> io::Result<Self> {
-        // SAFETY: ffi
-        unsafe {
-            let pd = create_resource(
-                || ibv_alloc_pd(ctx.ffi_ptr()),
-                || "failed to allocate protection domain",
-            )?;
-            Ok(Self {
-                pd,
-                _ctx: ctx.strong_ref(),
-            })
-        }
     }
 }
 
