@@ -1,12 +1,13 @@
 use crate::cc::CompChannelOwner;
 use crate::ctx::ContextOwner;
-use crate::error::create_resource;
+use crate::error::{create_resource, from_errno};
 use crate::resource::{Resource, ResourceOwner};
+use crate::utils::bool_to_c_int;
 use crate::CompChannel;
 use crate::Context;
 
 use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
-use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq};
+use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
 
 use std::cell::UnsafeCell;
 use std::io;
@@ -40,6 +41,29 @@ impl CompletionQueue {
         let cq = self.0.ctype();
         // SAFETY: reading a immutable field of a concurrent ffi type
         unsafe { mem::transmute((*cq).cq_context) }
+    }
+
+    fn req_notify(&self, solicited_only: bool) -> io::Result<()> {
+        // SAFETY: ffi
+        let ret = unsafe {
+            let cq = ibv_cq_ex_to_cq(self.0.ffi_ptr());
+            let solicited_only = bool_to_c_int(solicited_only);
+            ibv_req_notify_cq(cq, solicited_only)
+        };
+        if ret != 0 {
+            return Err(from_errno(ret));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn req_notify_all(&self) -> io::Result<()> {
+        self.req_notify(false)
+    }
+
+    #[inline]
+    pub fn req_notify_solicited(&self) -> io::Result<()> {
+        self.req_notify(true)
     }
 }
 
