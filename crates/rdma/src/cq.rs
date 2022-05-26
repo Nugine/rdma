@@ -2,16 +2,17 @@ use crate::cc::{self, CompChannel};
 use crate::ctx::{self, Context};
 use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
-use crate::utils::{bool_to_c_int, usize_to_void_ptr};
+use crate::utils::{bool_to_c_int, ptr_as_mut, usize_to_void_ptr};
 
 use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_ex_to_cq, ibv_cq_init_attr_ex};
 use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
 
 use std::cell::UnsafeCell;
 use std::io;
-use std::mem;
+use std::mem::{self, ManuallyDrop};
+use std::os::raw::c_void;
 use std::ptr::NonNull;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use numeric_cast::NumericCast;
 
@@ -40,7 +41,26 @@ impl CompletionQueue {
     #[inline]
     pub fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
         let owner = Arc::new(Owner::create(ctx, options)?);
+        // SAFETY: setup self-reference in cq_context
+        unsafe {
+            let owner_ptr: *const Owner = &*owner;
+            let cq = owner.ffi_ptr();
+            (*cq).cq_context = ptr_as_mut(owner_ptr).cast();
+        }
         Ok(Self(owner))
+    }
+
+    /// # Panics
+    /// + if the completion queue has been destroyed
+    ///
+    /// # SAFETY
+    /// 1. `cq_context` must come from the pointee of `CompletionQueue::ffi_ptr`
+    /// 2. there must be at least one weak reference to the completion queue owner
+    pub(crate) unsafe fn from_cq_context(cq_context: *mut c_void) -> Self {
+        let owner_ptr: *const Owner = cq_context.cast();
+        let weak = ManuallyDrop::new(Weak::from_raw(owner_ptr));
+        let owner = Weak::upgrade(&weak).expect("the completion queue has been destroyed");
+        Self(owner)
     }
 
     #[inline]
