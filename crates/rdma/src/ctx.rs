@@ -17,11 +17,9 @@ use rdma_sys::{ibv_close_device, ibv_open_device};
 use std::cell::UnsafeCell;
 use std::io;
 use std::ptr::NonNull;
+use std::sync::Arc;
 
-use asc::Asc;
-
-#[derive(Clone)]
-pub struct Context(Asc<Inner>);
+pub struct Context(Arc<Inner>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for Context {
@@ -32,7 +30,7 @@ unsafe impl Resource for Context {
     }
 
     fn strong_ref(&self) -> Self {
-        Self(Asc::clone(&self.0))
+        Self(Arc::clone(&self.0))
     }
 }
 
@@ -40,7 +38,7 @@ impl Context {
     #[inline]
     pub fn open(device: &Device) -> io::Result<Self> {
         let inner = Inner::open(device)?;
-        Ok(Self(Asc::new(inner)))
+        Ok(Self(Arc::new(inner)))
     }
 
     #[inline]

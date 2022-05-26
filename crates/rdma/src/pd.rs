@@ -7,10 +7,9 @@ use rdma_sys::{ibv_alloc_pd, ibv_dealloc_pd};
 
 use std::io;
 use std::ptr::NonNull;
+use std::sync::Arc;
 
-use asc::Asc;
-
-pub struct ProtectionDomain(Asc<Inner>);
+pub struct ProtectionDomain(Arc<Inner>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for ProtectionDomain {
@@ -21,7 +20,7 @@ unsafe impl Resource for ProtectionDomain {
     }
 
     fn strong_ref(&self) -> Self {
-        Self(Asc::clone(&self.0))
+        Self(Arc::clone(&self.0))
     }
 }
 
@@ -29,7 +28,7 @@ impl ProtectionDomain {
     #[inline]
     pub fn alloc(ctx: &Context) -> io::Result<Self> {
         let inner = Inner::alloc(ctx)?;
-        Ok(Self(Asc::new(inner)))
+        Ok(Self(Arc::new(inner)))
     }
 }
 

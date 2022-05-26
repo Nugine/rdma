@@ -20,12 +20,10 @@ use rdma_sys::{
 use std::cell::UnsafeCell;
 use std::os::raw::c_uint;
 use std::ptr::NonNull;
+use std::sync::Arc;
 use std::{io, mem};
 
-use asc::Asc;
-
-#[derive(Clone)]
-pub struct QueuePair(Asc<Inner>);
+pub struct QueuePair(Arc<Inner>);
 
 impl QueuePair {
     #[inline]
@@ -37,7 +35,7 @@ impl QueuePair {
     #[inline]
     pub fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
         let inner = Inner::create(ctx, options)?;
-        Ok(Self(Asc::new(inner)))
+        Ok(Self(Arc::new(inner)))
     }
 
     #[inline]
@@ -68,7 +66,7 @@ unsafe impl Resource for QueuePair {
     }
 
     fn strong_ref(&self) -> Self {
-        Self(Asc::clone(&self.0))
+        Self(Arc::clone(&self.0))
     }
 }
 

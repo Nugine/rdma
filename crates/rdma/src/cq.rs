@@ -13,11 +13,11 @@ use std::mem::{self, ManuallyDrop};
 use std::os::raw::c_void;
 use std::pin::Pin;
 use std::ptr::NonNull;
+use std::sync::Arc;
 
-use asc::Asc;
 use numeric_cast::NumericCast;
 
-pub struct CompletionQueue(Pin<Asc<Inner>>);
+pub struct CompletionQueue(Pin<Arc<Inner>>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for CompletionQueue {
@@ -41,14 +41,14 @@ impl CompletionQueue {
 
     #[inline]
     pub fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
-        let mut inner = Asc::new(Inner::create(ctx, options)?);
+        let inner = Arc::pin(Inner::create(ctx, options)?);
         // SAFETY: setup self-reference in cq_context
         unsafe {
             let cq: *mut ibv_cq_ex = inner.cq.as_ptr().cast();
-            let inner_ptr: *mut Inner = Asc::get_mut_unchecked(&mut inner);
-            (*cq).cq_context = inner_ptr.cast();
+            let inner_ptr: *const Inner = &*inner;
+            (*cq).cq_context = mem::transmute(inner_ptr);
         };
-        Ok(Self(Pin::new(inner)))
+        Ok(Self(inner))
     }
 
     #[inline]
@@ -62,8 +62,8 @@ impl CompletionQueue {
     /// 2. the completion queue must be alive when calling this method
     pub(crate) unsafe fn from_cq_context(cq_context: *mut c_void) -> Self {
         let inner_ptr: *const Inner = cq_context.cast();
-        let inner = ManuallyDrop::new(Asc::from_raw(inner_ptr));
-        Self(Pin::new(Asc::clone(&inner)))
+        let inner = ManuallyDrop::new(Arc::from_raw(inner_ptr));
+        Self(Pin::new(Arc::clone(&inner)))
     }
 
     fn req_notify(&self, solicited_only: bool) -> io::Result<()> {

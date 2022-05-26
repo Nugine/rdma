@@ -8,10 +8,9 @@ use rdma_sys::{ibv_create_comp_channel, ibv_destroy_comp_channel};
 use std::io;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::ptr::NonNull;
+use std::sync::Arc;
 
-use asc::Asc;
-
-pub struct CompChannel(Asc<Inner>);
+pub struct CompChannel(Arc<Inner>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for CompChannel {
@@ -22,7 +21,7 @@ unsafe impl Resource for CompChannel {
     }
 
     fn strong_ref(&self) -> Self {
-        Self(Asc::clone(&self.0))
+        Self(Arc::clone(&self.0))
     }
 }
 
@@ -30,7 +29,7 @@ impl CompChannel {
     #[inline]
     pub fn create(ctx: &Context) -> io::Result<Self> {
         let inner = Inner::create(ctx)?;
-        Ok(Self(Asc::new(inner)))
+        Ok(Self(Arc::new(inner)))
     }
 }
 
