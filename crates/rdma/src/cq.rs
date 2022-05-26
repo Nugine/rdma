@@ -9,13 +9,15 @@ use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq, ibv_req_notify_cq};
 
 use std::cell::UnsafeCell;
 use std::io;
-use std::mem;
+use std::mem::{self, ManuallyDrop};
+use std::os::raw::c_void;
+use std::pin::Pin;
 use std::ptr::NonNull;
 
 use asc::Asc;
 use numeric_cast::NumericCast;
 
-pub struct CompletionQueue(Asc<Inner>);
+pub struct CompletionQueue(Pin<Asc<Inner>>);
 
 /// SAFETY: shared resource type
 unsafe impl Resource for CompletionQueue {
@@ -26,7 +28,7 @@ unsafe impl Resource for CompletionQueue {
     }
 
     fn strong_ref(&self) -> Self {
-        Self(Asc::clone(&self.0))
+        Self(Pin::clone(&self.0))
     }
 }
 
@@ -39,18 +41,29 @@ impl CompletionQueue {
 
     #[inline]
     pub fn create(ctx: &Context, options: CompletionQueueOptions) -> io::Result<Self> {
-        let inner = Inner::create(ctx, options)?;
-        Ok(Self(Asc::new(inner)))
+        let mut inner = Asc::new(Inner::create(ctx, options)?);
+        // SAFETY: setup self-reference in cq_context
+        unsafe {
+            let cq: *mut ibv_cq_ex = inner.cq.as_ptr().cast();
+            let inner_ptr: *mut Inner = Asc::get_mut_unchecked(&mut inner);
+            (*cq).cq_context = inner_ptr.cast();
+        };
+        Ok(Self(Pin::new(inner)))
     }
 
-    // FIXME: clippy false positive: https://github.com/rust-lang/rust-clippy/issues/8622
-    #[allow(clippy::transmutes_expressible_as_ptr_casts)]
     #[inline]
     #[must_use]
     pub fn user_data(&self) -> usize {
-        let cq = self.ffi_ptr();
-        // SAFETY: reading a immutable field of a concurrent ffi type
-        unsafe { mem::transmute((*cq).cq_context) }
+        self.0.user_data
+    }
+
+    /// SAFETY:
+    /// 1. `cq_context` must come from `CompletionQueue::ffi_ptr`
+    /// 2. the completion queue must be alive when calling this method
+    pub(crate) unsafe fn from_cq_context(cq_context: *mut c_void) -> Self {
+        let inner_ptr: *const Inner = cq_context.cast();
+        let inner = ManuallyDrop::new(Asc::from_raw(inner_ptr));
+        Self(Pin::new(Asc::clone(&inner)))
     }
 
     fn req_notify(&self, solicited_only: bool) -> io::Result<()> {
@@ -79,6 +92,7 @@ impl CompletionQueue {
 
 struct Inner {
     cq: NonNull<UnsafeCell<ibv_cq>>,
+    user_data: usize,
 
     _ctx: Context,
     _cc: Option<CompChannel>,
@@ -111,6 +125,7 @@ impl Inner {
 
             Ok(Self {
                 cq: cq.cast(),
+                user_data: options.user_data,
                 _ctx: ctx.strong_ref(),
                 _cc: options.channel,
             })
