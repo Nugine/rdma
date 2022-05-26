@@ -15,6 +15,7 @@ use std::{io, ptr};
 
 use parking_lot::Mutex;
 
+#[derive(Clone)]
 pub struct CompChannel(Arc<Owner>);
 
 /// SAFETY: resource type

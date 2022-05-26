@@ -23,6 +23,7 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 use std::{io, mem};
 
+#[derive(Clone)]
 pub struct QueuePair(Arc<Owner>);
 
 /// SAFETY: resource type

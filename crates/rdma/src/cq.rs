@@ -16,6 +16,7 @@ use std::sync::{Arc, Weak};
 
 use numeric_cast::NumericCast;
 
+#[derive(Clone)]
 pub struct CompletionQueue(Arc<Owner>);
 
 /// SAFETY: resource type

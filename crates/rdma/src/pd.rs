@@ -9,6 +9,7 @@ use std::io;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct ProtectionDomain(Arc<Owner>);
 
 /// SAFETY: resource type
