@@ -1,17 +1,19 @@
-use crate::cq;
+use crate::cq::{self, CompletionQueue};
 use crate::ctx::{self, Context};
-use crate::error::create_resource;
+use crate::error::{create_resource, custom_error};
 use crate::resource::Resource;
 use crate::weakset::WeakSet;
 
-use parking_lot::Mutex;
-use rdma_sys::ibv_comp_channel;
+use rdma_sys::{ibv_comp_channel, ibv_cq, ibv_get_cq_event};
 use rdma_sys::{ibv_create_comp_channel, ibv_destroy_comp_channel};
 
-use std::io;
+use std::os::raw::c_void;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::ptr::NonNull;
 use std::sync::{Arc, Weak};
+use std::{io, ptr};
+
+use parking_lot::Mutex;
 
 pub struct CompChannel(Arc<Owner>);
 
@@ -45,6 +47,26 @@ impl CompChannel {
             })
         };
         Ok(Self(owner))
+    }
+
+    #[inline]
+    pub fn wait_cq_event(&self) -> io::Result<CompletionQueue> {
+        let cc = self.ffi_ptr();
+        let mut cq: *mut ibv_cq = ptr::null_mut();
+        let mut cq_context: *mut c_void = ptr::null_mut();
+        // SAFETY: ffi
+        unsafe {
+            let ret = ibv_get_cq_event(cc, &mut cq, &mut cq_context);
+            if ret != 0 {
+                return Err(custom_error("failed to get completion event"));
+            }
+            debug_assert_eq!((*cq).cq_context, cq_context);
+        }
+        // SAFETY:
+        // 1. the cq is associated with the cc
+        // 2. the cc is holding a weak reference to the cq
+        // 3. here may panic because the cq may have been destroyed
+        unsafe { Ok(CompletionQueue::from_cq_context(cq_context)) }
     }
 }
 
