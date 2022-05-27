@@ -1,5 +1,6 @@
 use crate::ctx::{self, Context};
 use crate::error::create_resource;
+use crate::qp::{QueuePair, QueuePairOptions};
 use crate::resource::Resource;
 
 use rdma_sys::ibv_pd;
@@ -40,6 +41,11 @@ impl ProtectionDomain {
             })
         };
         Ok(Self(owner))
+    }
+
+    #[inline]
+    pub fn create_qp(&self, options: QueuePairOptions) -> io::Result<QueuePair> {
+        QueuePair::create(self, options)
     }
 }
 

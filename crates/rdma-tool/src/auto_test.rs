@@ -109,7 +109,6 @@ pub fn run() -> anyhow::Result<()> {
                 .user_data(1)
                 .send_cq(&cq1)
                 .recv_cq(&cq1)
-                .pd(&pd)
                 .qp_type(QueuePairType::RC)
                 .sq_sig_all(true)
                 .max_send_wr(8)
@@ -117,7 +116,7 @@ pub fn run() -> anyhow::Result<()> {
                 .max_send_sge(8)
                 .max_recv_sge(8)
                 .max_inline_data(8);
-            ctx.create_qp(options)?
+            pd.create_qp(options)?
         };
         println!("{indent}qp: {:?}", qp1.id());
 
@@ -127,7 +126,6 @@ pub fn run() -> anyhow::Result<()> {
                 .user_data(2)
                 .send_cq(&cq2)
                 .recv_cq(&cq3)
-                .pd(&pd)
                 .qp_type(QueuePairType::UD)
                 .sq_sig_all(true)
                 .max_send_wr(8)
@@ -135,7 +133,7 @@ pub fn run() -> anyhow::Result<()> {
                 .max_send_sge(8)
                 .max_recv_sge(8)
                 .max_inline_data(8);
-            ctx.create_qp(options)?
+            pd.create_qp(options)?
         };
         println!("{indent}qp: {:?}", qp2.id());
 

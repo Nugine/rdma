@@ -3,7 +3,6 @@ use crate::cq::{CompletionQueue, CompletionQueueOptions};
 use crate::device::Device;
 use crate::error::create_resource;
 use crate::pd::ProtectionDomain;
-use crate::qp::{QueuePair, QueuePairOptions};
 use crate::query::DeviceAttr;
 use crate::query::GidEntry;
 use crate::query::PortAttr;
@@ -75,11 +74,6 @@ impl Context {
     #[inline]
     pub fn query_gid_entry(&self, port_num: u32, gid_index: u32) -> io::Result<GidEntry> {
         GidEntry::query(self, port_num, gid_index)
-    }
-
-    #[inline]
-    pub fn create_qp(&self, options: QueuePairOptions) -> io::Result<QueuePair> {
-        QueuePair::create(self, options)
     }
 }
 

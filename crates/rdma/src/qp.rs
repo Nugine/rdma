@@ -1,5 +1,4 @@
 use crate::cq::{self, CompletionQueue};
-use crate::ctx::{self, Context};
 use crate::error::create_resource;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
@@ -51,26 +50,30 @@ impl QueuePair {
     /// 2. if the option `qp_type` is not set
     /// 3. if the option `sq_sig_all` is not set
     #[inline]
-    pub fn create(ctx: &Context, options: QueuePairOptions) -> io::Result<Self> {
-        assert!(options.pd.is_some(), "pd is required");
+    pub fn create(pd: &ProtectionDomain, options: QueuePairOptions) -> io::Result<Self> {
         assert!(options.qp_type.is_some(), "qp_type is required");
         assert!(options.sq_sig_all.is_some(), "sq_sig_all is required");
         // SAFETY: ffi
         let owner = unsafe {
-            let context = ctx.ffi_ptr();
+            let context = (*pd.ffi_ptr()).context;
 
             let mut qp_attr: ibv_qp_init_attr_ex = mem::zeroed();
+
+            qp_attr.pd = pd.ffi_ptr();
+
             qp_attr.qp_context = usize_to_void_ptr(options.user_data);
+
             if let Some(ref send_cq) = options.send_cq {
                 qp_attr.send_cq = ibv_cq_ex_to_cq(send_cq.ffi_ptr());
             }
+
             if let Some(ref recv_cq) = options.recv_cq {
                 qp_attr.recv_cq = ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
             }
+
             qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
             qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
             qp_attr.cap = options.cap;
-            qp_attr.pd = options.pd.as_ref().unwrap_unchecked().ffi_ptr();
             qp_attr.comp_mask = IBV_QP_INIT_ATTR_PD;
 
             let qp = create_resource(
@@ -80,8 +83,7 @@ impl QueuePair {
 
             Arc::new(Owner {
                 qp: qp.cast(),
-                _ctx: ctx.strong_ref(),
-                _pd: options.pd,
+                _pd: pd.strong_ref(),
                 _send_cq: options.send_cq,
                 _recv_cq: options.recv_cq,
             })
@@ -109,8 +111,7 @@ impl QueuePair {
 pub(crate) struct Owner {
     qp: NonNull<UnsafeCell<ibv_qp>>,
 
-    _ctx: Arc<ctx::Owner>,
-    _pd: Option<Arc<pd::Owner>>,
+    _pd: Arc<pd::Owner>,
     _send_cq: Option<Arc<cq::Owner>>,
     _recv_cq: Option<Arc<cq::Owner>>,
 }
@@ -144,7 +145,6 @@ pub struct QueuePairOptions {
     qp_type: Option<QueuePairType>,
     sq_sig_all: Option<bool>,
     cap: ibv_qp_cap,
-    pd: Option<Arc<pd::Owner>>,
 }
 
 impl Default for QueuePairOptions {
@@ -158,7 +158,6 @@ impl Default for QueuePairOptions {
             sq_sig_all: None,
             // SAFETY: POD ffi type
             cap: unsafe { mem::zeroed() },
-            pd: None,
         }
     }
 }
@@ -187,11 +186,6 @@ impl QueuePairOptions {
     #[inline]
     pub fn sq_sig_all(&mut self, sq_sig_all: bool) -> &mut Self {
         self.sq_sig_all = Some(sq_sig_all);
-        self
-    }
-    #[inline]
-    pub fn pd(&mut self, pd: &ProtectionDomain) -> &mut Self {
-        self.pd = Some(pd.strong_ref());
         self
     }
     #[inline]
