@@ -15,7 +15,8 @@
     clippy::shadow_unrelated,
     clippy::panic,
     clippy::enum_glob_use,
-    clippy::exhaustive_enums
+    clippy::exhaustive_enums,
+    clippy::exhaustive_structs
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
@@ -35,6 +36,7 @@ pub mod device;
 pub mod pd;
 pub mod qp;
 pub mod wc;
+pub mod wr;
 
 pub mod query {
     mod device_attr;
