@@ -229,3 +229,23 @@ pub unsafe fn ibv_free_dm(dm: *mut ibv_dm) -> c_int {
     let op: _ = (*vctx).free_dm.unwrap_unchecked();
     (op)(dm)
 }
+
+pub unsafe fn ibv_post_send(
+    qp: *mut ibv_qp,
+    wr: *mut ibv_send_wr,
+    bad_wr: *mut *mut ibv_send_wr,
+) -> c_int {
+    let ctx: *mut ibv_context = (*qp).context;
+    let op: _ = (*ctx).ops.post_send.unwrap_unchecked();
+    (op)(qp, wr, bad_wr)
+}
+
+pub unsafe fn ibv_post_recv(
+    qp: *mut ibv_qp,
+    wr: *mut ibv_recv_wr,
+    bad_wr: *mut *mut ibv_recv_wr,
+) -> c_int {
+    let ctx: *mut ibv_context = (*qp).context;
+    let op: _ = (*ctx).ops.post_recv.unwrap_unchecked();
+    (op)(qp, wr, bad_wr)
+}
