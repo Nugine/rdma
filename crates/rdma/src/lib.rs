@@ -34,6 +34,7 @@ pub mod device;
 pub mod cc;
 pub mod cq;
 pub mod ctx;
+pub mod dm;
 pub mod mr;
 pub mod mw;
 pub mod pd;
