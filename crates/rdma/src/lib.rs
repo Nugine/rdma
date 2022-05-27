@@ -29,11 +29,13 @@ mod resource;
 mod utils;
 mod weakset;
 
+pub mod device;
+
 pub mod cc;
 pub mod cq;
 pub mod ctx;
-pub mod device;
 pub mod mr;
+pub mod mw;
 pub mod pd;
 pub mod qp;
 pub mod wc;
