@@ -189,3 +189,20 @@ pub unsafe fn ibv_poll_cq(cq: *mut ibv_cq, num_entries: c_int, wc: *mut ibv_wc) 
     let op: _ = (*ctx).ops.poll_cq.unwrap_unchecked();
     (op)(cq, num_entries, wc)
 }
+
+pub unsafe fn ibv_alloc_mw(pd: *mut ibv_pd, mw_type: ibv_mw_type) -> *mut ibv_mw {
+    let ctx: *mut ibv_context = (*pd).context;
+    let op: _ = (*ctx).ops.alloc_mw;
+    if op.is_none() {
+        set_errno(EOPNOTSUPP);
+        return ptr::null_mut();
+    }
+    let op: _ = op.unwrap_unchecked();
+    (op)(pd, mw_type)
+}
+
+pub unsafe fn ibv_dealloc_mw(mw: *mut ibv_mw) -> c_int {
+    let ctx: *mut ibv_context = (*mw).context;
+    let op: _ = (*ctx).ops.dealloc_mw.unwrap_unchecked();
+    (op)(mw)
+}
