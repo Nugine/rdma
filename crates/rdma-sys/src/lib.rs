@@ -206,3 +206,26 @@ pub unsafe fn ibv_dealloc_mw(mw: *mut ibv_mw) -> c_int {
     let op: _ = (*ctx).ops.dealloc_mw.unwrap_unchecked();
     (op)(mw)
 }
+
+pub unsafe fn ibv_alloc_dm(context: *mut ibv_context, attr: *mut ibv_alloc_dm_attr) -> *mut ibv_dm {
+    let vctx: *mut verbs_context = verbs_get_ctx_op!(context, alloc_dm);
+
+    if vctx.is_null() {
+        set_errno(EOPNOTSUPP);
+        return ptr::null_mut();
+    }
+
+    let op: _ = (*vctx).alloc_dm.unwrap_unchecked();
+    (op)(context, attr)
+}
+
+pub unsafe fn ibv_free_dm(dm: *mut ibv_dm) -> c_int {
+    let vctx: *mut verbs_context = verbs_get_ctx_op!((*dm).context, free_dm);
+
+    if vctx.is_null() {
+        return EOPNOTSUPP;
+    }
+
+    let op: _ = (*vctx).free_dm.unwrap_unchecked();
+    (op)(dm)
+}
