@@ -7,11 +7,10 @@ use crate::wc::WorkCompletion;
 
 use rdma_sys::ibv_cq_ex_to_cq;
 use rdma_sys::{ibv_ack_cq_events, ibv_req_notify_cq};
-use rdma_sys::{ibv_cq, ibv_cq_ex, ibv_cq_init_attr_ex};
+use rdma_sys::{ibv_cq_ex, ibv_cq_init_attr_ex};
 use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq};
 use rdma_sys::{ibv_poll_cq, ibv_wc};
 
-use std::cell::UnsafeCell;
 use std::mem::{self, ManuallyDrop, MaybeUninit};
 use std::os::raw::{c_int, c_uint, c_void};
 use std::ptr::NonNull;
@@ -64,7 +63,7 @@ impl CompletionQueue {
             )?;
 
             Arc::new(Owner {
-                cq: cq.cast(),
+                cq,
                 user_data: options.user_data,
                 comp_events_completed: AtomicU32::new(0),
                 _ctx: ctx.strong_ref(),
@@ -155,7 +154,7 @@ impl CompletionQueue {
 }
 
 pub(crate) struct Owner {
-    cq: NonNull<UnsafeCell<ibv_cq>>,
+    cq: NonNull<ibv_cq_ex>,
     user_data: usize,
     comp_events_completed: AtomicU32,
 
@@ -170,7 +169,7 @@ unsafe impl Sync for Owner {}
 
 impl Owner {
     pub(crate) fn ffi_ptr(&self) -> *mut ibv_cq_ex {
-        self.cq.as_ptr().cast()
+        self.cq.as_ptr()
     }
 }
 

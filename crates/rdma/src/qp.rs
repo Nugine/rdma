@@ -16,7 +16,6 @@ use rdma_sys::{
     IBV_QPT_XRC_SEND, //
 };
 
-use std::cell::UnsafeCell;
 use std::os::raw::c_uint;
 use std::ptr::NonNull;
 use std::sync::Arc;
@@ -82,7 +81,7 @@ impl QueuePair {
             )?;
 
             Arc::new(Owner {
-                qp: qp.cast(),
+                qp,
                 _pd: pd.strong_ref(),
                 _send_cq: options.send_cq,
                 _recv_cq: options.recv_cq,
@@ -109,7 +108,7 @@ impl QueuePair {
 }
 
 pub(crate) struct Owner {
-    qp: NonNull<UnsafeCell<ibv_qp>>,
+    qp: NonNull<ibv_qp>,
 
     _pd: Arc<pd::Owner>,
     _send_cq: Option<Arc<cq::Owner>>,
@@ -123,7 +122,7 @@ unsafe impl Sync for Owner {}
 
 impl Owner {
     fn ffi_ptr(&self) -> *mut ibv_qp {
-        self.qp.as_ptr().cast()
+        self.qp.as_ptr()
     }
 }
 
@@ -131,7 +130,7 @@ impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {
-            let qp: *mut ibv_qp = self.qp.as_ptr().cast();
+            let qp: *mut ibv_qp = self.ffi_ptr();
             let ret = ibv_destroy_qp(qp);
             assert_eq!(ret, 0);
         }

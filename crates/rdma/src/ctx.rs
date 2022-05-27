@@ -11,7 +11,6 @@ use crate::resource::Resource;
 use rdma_sys::ibv_context;
 use rdma_sys::{ibv_close_device, ibv_open_device};
 
-use std::cell::UnsafeCell;
 use std::io;
 use std::ptr::NonNull;
 use std::sync::Arc;
@@ -41,7 +40,7 @@ impl Context {
                 || ibv_open_device(device.ffi_ptr()),
                 || "failed to open device",
             )?;
-            Arc::new(Owner { ctx: ctx.cast() })
+            Arc::new(Owner { ctx })
         };
         Ok(Self(owner))
     }
@@ -78,7 +77,7 @@ impl Context {
 }
 
 pub(crate) struct Owner {
-    ctx: NonNull<UnsafeCell<ibv_context>>,
+    ctx: NonNull<ibv_context>,
 }
 
 /// SAFETY: owned type
@@ -88,7 +87,7 @@ unsafe impl Sync for Owner {}
 
 impl Owner {
     fn ffi_ptr(&self) -> *mut ibv_context {
-        self.ctx.as_ptr().cast()
+        self.ctx.as_ptr()
     }
 }
 
