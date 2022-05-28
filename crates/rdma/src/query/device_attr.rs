@@ -26,7 +26,7 @@ impl DeviceAttr {
 
     #[inline]
     #[must_use]
-    pub fn physical_port_count(&self) -> u32 {
-        self.0.orig_attr.phys_port_cnt.into()
+    pub fn physical_port_count(&self) -> u8 {
+        self.0.orig_attr.phys_port_cnt
     }
 }

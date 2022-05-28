@@ -12,9 +12,7 @@ pub struct PortAttr(Box<C::ibv_port_attr>);
 
 impl PortAttr {
     #[inline]
-    pub fn query(ctx: &Context, port_num: u32) -> io::Result<Self> {
-        let port_num: u8 = port_num.numeric_cast();
-
+    pub fn query(ctx: &Context, port_num: u8) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
             let mut port_attr = box_new_uninit::<C::ibv_port_attr>();

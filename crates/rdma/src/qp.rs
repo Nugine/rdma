@@ -1,11 +1,11 @@
 use crate::bindings as C;
 use crate::cq::{self, CompletionQueue};
 use crate::error::{create_resource, from_errno};
+use crate::mr::AccessFlags;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
-use crate::utils::{
-    bool_to_c_int, c_uint_to_u32, u32_as_c_uint, usize_to_void_ptr, void_ptr_to_usize,
-};
+use crate::utils::{bool_to_c_int, c_uint_to_u32, u32_as_c_uint};
+use crate::utils::{usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
 
 use std::os::raw::{c_int, c_uint};
@@ -309,6 +309,32 @@ impl Default for ModifyOptions {
     }
 }
 
+impl ModifyOptions {
+    #[inline]
+    pub fn qp_state(&mut self, qp_state: QueuePairState) -> &mut Self {
+        self.attr.qp_state = qp_state.to_c_uint();
+        self
+    }
+
+    #[inline]
+    pub fn pkey_index(&mut self, pkey_index: u16) -> &mut Self {
+        self.attr.pkey_index = pkey_index;
+        self
+    }
+
+    #[inline]
+    pub fn port_num(&mut self, port_num: u8) -> &mut Self {
+        self.attr.port_num = port_num;
+        self
+    }
+
+    #[inline]
+    pub fn qp_access_flags(&mut self, access_flags: AccessFlags) -> &mut Self {
+        self.attr.qp_access_flags = access_flags.to_c_uint();
+        self
+    }
+}
+
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct QueryOptions {
@@ -329,6 +355,12 @@ impl QueryOptions {
         self.mask |= C::IBV_QP_CAP;
         self
     }
+
+    #[inline]
+    pub fn qp_state(&mut self) -> &mut Self {
+        self.mask |= C::IBV_QP_STATE;
+        self
+    }
 }
 
 #[repr(C)]
@@ -342,5 +374,44 @@ impl QueuePairAttr {
     #[must_use]
     pub fn max_inline_data(&self) -> Option<u32> {
         (self.mask & C::IBV_QP_CAP != 0).then(|| self.attr.cap.max_inline_data)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn qp_state(&self) -> Option<QueuePairState> {
+        (self.mask & C::IBV_QP_STATE != 0).then(|| QueuePairState::from_c_uint(self.attr.qp_state))
+    }
+}
+
+#[derive(Clone, Copy)]
+#[repr(u32)]
+pub enum QueuePairState {
+    Reset = c_uint_to_u32(C::IBV_QPS_RESET),
+    Initialize = c_uint_to_u32(C::IBV_QPS_INIT),
+    ReadyToReceive = c_uint_to_u32(C::IBV_QPS_RTR),
+    ReadyToSend = c_uint_to_u32(C::IBV_QPS_RTS),
+    SendQueueDrained = c_uint_to_u32(C::IBV_QPS_SQD),
+    SendQueueError = c_uint_to_u32(C::IBV_QPS_SQE),
+    Error = c_uint_to_u32(C::IBV_QPS_ERR),
+    Unknown = c_uint_to_u32(C::IBV_QPS_UNKNOWN), // ASK: what is this
+}
+
+impl QueuePairState {
+    fn from_c_uint(val: c_uint) -> Self {
+        match val {
+            C::IBV_QPS_RESET => Self::Reset,
+            C::IBV_QPS_INIT => Self::Initialize,
+            C::IBV_QPS_RTR => Self::ReadyToReceive,
+            C::IBV_QPS_RTS => Self::ReadyToSend,
+            C::IBV_QPS_SQD => Self::SendQueueDrained,
+            C::IBV_QPS_SQE => Self::SendQueueError,
+            C::IBV_QPS_ERR => Self::Error,
+            _ => panic!("unexpected queue pair state"),
+        }
+    }
+
+    fn to_c_uint(self) -> c_uint {
+        #[allow(clippy::as_conversions)]
+        u32_as_c_uint(self as u32)
     }
 }

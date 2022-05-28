@@ -131,7 +131,7 @@ bitflags! {
 }
 
 impl AccessFlags {
-    fn to_c_uint(self) -> c_uint {
+    pub(crate) fn to_c_uint(self) -> c_uint {
         u32_as_c_uint(self.bits())
     }
 }
