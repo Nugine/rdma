@@ -207,6 +207,29 @@ pub unsafe fn ibv_dealloc_mw(mw: *mut ibv_mw) -> c_int {
     (op)(mw)
 }
 
+pub unsafe fn ibv_bind_mw(qp: *mut ibv_qp, mw: *mut ibv_mw, mw_bind: *mut ibv_mw_bind) -> c_int {
+    {
+        let mw = &*mw;
+        if (*mw).type_ != IBV_MW_TYPE_1 {
+            return EINVAL;
+        }
+
+        let bind_info = &((*mw_bind).bind_info);
+        if bind_info.mr.is_null() && (bind_info.addr != 0 || bind_info.length != 0) {
+            return EINVAL;
+        }
+        if bind_info.mr.is_null().not() && (mw.pd != (*bind_info.mr).pd) {
+            return EPERM;
+        }
+    }
+
+    {
+        let ctx: *mut ibv_context = (*mw).context;
+        let op: _ = (*ctx).ops.bind_mw.unwrap_unchecked();
+        (op)(qp, mw, mw_bind)
+    }
+}
+
 pub unsafe fn ibv_alloc_dm(context: *mut ibv_context, attr: *mut ibv_alloc_dm_attr) -> *mut ibv_dm {
     let vctx: *mut verbs_context = verbs_get_ctx_op!(context, alloc_dm);
 
