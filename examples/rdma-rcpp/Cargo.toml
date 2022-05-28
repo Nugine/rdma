@@ -7,6 +7,8 @@ edition = "2021"
 anyhow = "1.0.57"
 bytemuck = { version = "1.9.1", features = ["derive"] }
 clap = { version = "3.1.18", features = ["derive"] }
+libc = "0.2.126"
+numeric_cast = "0.1.2"
 rdma = { path = "../../crates/rdma" }
 tracing = "0.1.34"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }

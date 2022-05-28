@@ -1,3 +1,5 @@
+#![deny(clippy::all)]
+
 use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList};
 
@@ -21,6 +23,10 @@ struct Args {
     /// IB device (default first device found)
     #[clap(short = 'd', long)]
     ib_dev: Option<String>,
+
+    /// size of message to exchange
+    #[clap(short = 's', long, default_value = "4096")]
+    size: usize,
 }
 
 fn main() -> Result<()> {
@@ -41,6 +47,11 @@ fn main() -> Result<()> {
         Some(server) => info!(?server, "run client"),
         None => info!("run server"),
     }
+
+    let buf: Vec<u8> = {
+        assert_ne!(args.size, 0);
+        vec![0xcc; args.size]
+    };
 
     let ctx = {
         let dev_list = DeviceList::available()?;
