@@ -1,8 +1,8 @@
 use rdma::device::DeviceList;
 
-use anyhow::Result;
+use std::io;
 
-fn main() -> Result<()> {
+fn main() -> io::Result<()> {
     let dev_list = DeviceList::available()?;
     if dev_list.is_empty() {
         println!("No available rdma devices");

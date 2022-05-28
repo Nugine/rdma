@@ -4,5 +4,4 @@ version = "0.1.0-dev"
 edition = "2021"
 
 [dependencies]
-anyhow = { version = "1.0.57", features = ["backtrace"] }
 rdma = { path = "../../crates/rdma" }
