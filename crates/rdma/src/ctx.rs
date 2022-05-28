@@ -1,12 +1,6 @@
 use crate::bindings as C;
-use crate::cc::CompChannel;
-use crate::cq::{CompletionQueue, CompletionQueueOptions};
 use crate::device::Device;
 use crate::error::create_resource;
-use crate::pd::ProtectionDomain;
-use crate::query::DeviceAttr;
-use crate::query::GidEntry;
-use crate::query::PortAttr;
 use crate::resource::Resource;
 
 use std::io;
@@ -41,36 +35,6 @@ impl Context {
             Arc::new(Owner { ctx })
         };
         Ok(Self(owner))
-    }
-
-    #[inline]
-    pub fn alloc_pd(&self) -> io::Result<ProtectionDomain> {
-        ProtectionDomain::alloc(self)
-    }
-
-    #[inline]
-    pub fn create_cc(&self) -> io::Result<CompChannel> {
-        CompChannel::create(self)
-    }
-
-    #[inline]
-    pub fn create_cq(&self, options: CompletionQueueOptions) -> io::Result<CompletionQueue> {
-        CompletionQueue::create(self, options)
-    }
-
-    #[inline]
-    pub fn query_device(&self) -> io::Result<DeviceAttr> {
-        DeviceAttr::query(self)
-    }
-
-    #[inline]
-    pub fn query_port(&self, port_num: u32) -> io::Result<PortAttr> {
-        PortAttr::query(self, port_num)
-    }
-
-    #[inline]
-    pub fn query_gid_entry(&self, port_num: u32, gid_index: u32) -> io::Result<GidEntry> {
-        GidEntry::query(self, port_num, gid_index)
     }
 }
 

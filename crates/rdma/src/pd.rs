@@ -1,7 +1,6 @@
 use crate::bindings as C;
 use crate::ctx::{self, Context};
 use crate::error::create_resource;
-use crate::qp::{QueuePair, QueuePairOptions};
 use crate::resource::Resource;
 
 use std::io;
@@ -39,11 +38,6 @@ impl ProtectionDomain {
             })
         };
         Ok(Self(owner))
-    }
-
-    #[inline]
-    pub fn create_qp(&self, options: QueuePairOptions) -> io::Result<QueuePair> {
-        QueuePair::create(self, options)
     }
 }
 
