@@ -140,6 +140,23 @@ impl QueuePair {
             Ok(())
         }
     }
+
+    #[inline]
+    pub fn query(&self, options: QueryOptions) -> io::Result<QueuePairAttr> {
+        let qp = self.ffi_ptr();
+        // SAFETY: ffi
+        unsafe {
+            let attr_mask: c_int = mem::transmute(options.mask);
+            let mut attr: QueuePairAttr = mem::zeroed();
+            let mut init_attr: C::ibv_qp_init_attr = mem::zeroed();
+            let ret = C::ibv_query_qp(qp, &mut attr.attr, attr_mask, &mut init_attr);
+            if ret != 0 {
+                return Err(from_errno(ret));
+            }
+            attr.mask = options.mask;
+            Ok(attr)
+        }
+    }
 }
 
 pub(crate) struct Owner {
@@ -289,5 +306,41 @@ impl Default for ModifyOptions {
     fn default() -> Self {
         // SAFETY: POD ffi type
         unsafe { mem::zeroed() }
+    }
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct QueryOptions {
+    mask: C::ibv_qp_attr_mask,
+}
+
+impl Default for QueryOptions {
+    #[inline]
+    fn default() -> Self {
+        // SAFETY: POD ffi type
+        unsafe { mem::zeroed() }
+    }
+}
+
+impl QueryOptions {
+    #[inline]
+    pub fn cap(&mut self) -> &mut Self {
+        self.mask |= C::IBV_QP_CAP;
+        self
+    }
+}
+
+#[repr(C)]
+pub struct QueuePairAttr {
+    mask: C::ibv_qp_attr_mask,
+    attr: C::ibv_qp_attr,
+}
+
+impl QueuePairAttr {
+    #[inline]
+    #[must_use]
+    pub fn max_inline_data(&self) -> Option<u32> {
+        (self.mask & C::IBV_QP_CAP != 0).then(|| self.attr.cap.max_inline_data)
     }
 }
