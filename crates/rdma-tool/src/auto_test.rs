@@ -118,7 +118,7 @@ pub fn run() -> anyhow::Result<()> {
                 .max_inline_data(8);
             pd.create_qp(options)?
         };
-        println!("{indent}qp: {:?}", qp1.id());
+        println!("{indent}qp: {:?}", qp1.number());
 
         let qp2 = {
             let mut options: _ = QueuePair::options();
@@ -135,7 +135,7 @@ pub fn run() -> anyhow::Result<()> {
                 .max_inline_data(8);
             pd.create_qp(options)?
         };
-        println!("{indent}qp: {:?}", qp2.id());
+        println!("{indent}qp: {:?}", qp2.number());
 
         indent.pop();
         println!()

@@ -92,10 +92,10 @@ impl QueuePair {
 
     #[inline]
     #[must_use]
-    pub fn id(&self) -> QueuePairId {
+    pub fn number(&self) -> QueuePairNumber {
         let qp = self.ffi_ptr();
         // SAFETY: reading a immutable field of a concurrent ffi type
-        QueuePairId(unsafe { (*qp).qp_num })
+        QueuePairNumber(unsafe { (*qp).qp_num })
     }
 
     #[inline]
@@ -215,7 +215,15 @@ impl QueuePairOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct QueuePairId(u32);
+pub struct QueuePairNumber(u32);
+
+impl QueuePairNumber {
+    #[inline]
+    #[must_use]
+    pub fn raw_value(self) -> u32 {
+        self.0
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
