@@ -125,6 +125,9 @@ impl Device {
     }
 
     /// Returns kernel device name
+    ///
+    /// # Panics
+    /// + if the device name is not a valid utf8 string
     #[inline]
     #[must_use]
     pub fn name(&self) -> &str {
@@ -158,6 +161,7 @@ impl fmt::Debug for Device {
 }
 
 impl Guid {
+    /// Constructs a Guid from network bytes.
     #[inline]
     #[must_use]
     pub fn from_bytes(bytes: [u8; 8]) -> Self {
