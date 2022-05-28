@@ -17,7 +17,7 @@ use rdma_sys::{
 };
 
 use std::io;
-use std::os::raw::{c_int, c_void};
+use std::os::raw::{c_uint, c_void};
 use std::ptr::NonNull;
 use std::sync::Arc;
 
@@ -54,7 +54,7 @@ impl MemoryRegion {
     ) -> io::Result<Self> {
         let owner = {
             let addr: *mut c_void = addr.cast();
-            let access_flags = access_flags.to_c_int();
+            let access_flags = access_flags.to_c_uint();
             let mr = create_resource(
                 || ibv_reg_mr(pd.ffi_ptr(), addr, length, access_flags),
                 || "failed to register memory region",
@@ -144,7 +144,7 @@ bitflags! {
 
 impl AccessFlags {
     #[allow(clippy::as_conversions)]
-    fn to_c_int(self) -> c_int {
-        self.bits() as c_int
+    fn to_c_uint(self) -> c_uint {
+        self.bits() as c_uint
     }
 }

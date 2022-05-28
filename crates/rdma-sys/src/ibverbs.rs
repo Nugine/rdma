@@ -7,11 +7,6 @@ use std::mem;
 use std::ops::Not;
 use std::ptr;
 
-#[inline]
-pub unsafe fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
-    cq.cast()
-}
-
 /// Calculates the offset of the specified field from the start of the named struct.
 /// This macro is impossible to be const until feature(const_ptr_offset_from) is stable.
 macro_rules! offset_of {
@@ -47,6 +42,31 @@ macro_rules! container_of {
 #[inline(always)]
 unsafe fn set_errno(errno: i32) {
     __errno_location().write(errno)
+}
+
+mod compat {
+    use super::{_compat_ibv_port_attr, ibv_context, ibv_mr, ibv_pd};
+    use super::{c_int, c_uint, c_void};
+
+    extern "C" {
+        pub fn ibv_query_port(
+            context: *mut ibv_context,
+            port_num: u8,
+            port_attr: *mut _compat_ibv_port_attr,
+        ) -> c_int;
+
+        pub fn ibv_reg_mr(
+            pd: *mut ibv_pd,
+            addr: *mut c_void,
+            length: usize,
+            access: c_uint,
+        ) -> *mut ibv_mr;
+    }
+}
+
+#[inline]
+pub unsafe fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
+    cq.cast()
 }
 
 #[inline]
@@ -101,18 +121,6 @@ pub unsafe fn ibv_query_gid_ex(
         flags,
         mem::size_of::<ibv_gid_entry>(),
     )
-}
-
-mod compat {
-    use super::{_compat_ibv_port_attr, c_int, ibv_context};
-
-    extern "C" {
-        pub fn ibv_query_port(
-            context: *mut ibv_context,
-            port_num: u8,
-            port_attr: *mut _compat_ibv_port_attr,
-        ) -> c_int;
-    }
 }
 
 #[inline]
@@ -284,4 +292,17 @@ pub unsafe fn ibv_post_recv(
     let ctx: *mut ibv_context = (*qp).context;
     let op: _ = (*ctx).ops.post_recv.unwrap_unchecked();
     (op)(qp, wr, bad_wr)
+}
+
+#[inline]
+pub unsafe fn ibv_reg_mr(
+    pd: *mut ibv_pd,
+    addr: *mut c_void,
+    length: usize,
+    access: c_uint,
+) -> *mut ibv_mr {
+    if access & _RS_IBV_ACCESS_OPTIONAL_RANGE == 0 {
+        return compat::ibv_reg_mr(pd, addr, length, access);
+    }
+    ibv_reg_mr_iova2(pd, addr, length, addr as usize as _, access)
 }
