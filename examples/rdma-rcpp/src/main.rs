@@ -7,10 +7,10 @@ use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
-use rdma::qp::{self, QueuePair, QueuePairType};
+use rdma::qp::{self, QueuePair, QueuePairState, QueuePairType};
 
 use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -21,7 +21,7 @@ struct Opt {
     #[clap(flatten)]
     args: Args,
 
-    server: Option<SocketAddr>,
+    server: Option<IpAddr>,
 }
 
 #[derive(Debug, clap::Args)]
@@ -37,6 +37,10 @@ struct Args {
     /// number of receives to post at a time
     #[clap(short = 'r', long, default_value = "500")]
     rx_depth: usize,
+
+    /// port of IB device
+    #[clap(short = 'i', long, default_value = "1")]
+    ib_port: u8,
 }
 
 fn main() -> Result<()> {
@@ -61,7 +65,7 @@ fn main() -> Result<()> {
     run(&args, server)
 }
 
-fn run(args: &Args, server: Option<SocketAddr>) -> Result<()> {
+fn run(args: &Args, server: Option<IpAddr>) -> Result<()> {
     let mut buf: Vec<u8> = {
         assert_ne!(args.size, 0);
         vec![0xcc; args.size]
@@ -112,7 +116,15 @@ fn run(args: &Args, server: Option<SocketAddr>) -> Result<()> {
         max_inline_data >= args.rx_depth
     };
 
-    
+    {
+        let mut options = qp::ModifyOptions::default();
+        options
+            .qp_state(QueuePairState::Initialize)
+            .pkey_index(0)
+            .port_num(args.ib_port)
+            .qp_access_flags(AccessFlags::empty());
+        qp.modify(options)?;
+    }
 
     Ok(())
 }
