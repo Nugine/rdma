@@ -1,7 +1,13 @@
 #![deny(clippy::all)]
 
+use numeric_cast::NumericCast;
+use rdma::cc::CompChannel;
+use rdma::cq::CompletionQueue;
 use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList};
+use rdma::mr::{AccessFlags, MemoryRegion};
+use rdma::pd::ProtectionDomain;
+use rdma::qp::{QueuePair, QueuePairType};
 
 use std::env;
 use std::net::SocketAddr;
@@ -27,6 +33,10 @@ struct Args {
     /// size of message to exchange
     #[clap(short = 's', long, default_value = "4096")]
     size: usize,
+
+    /// number of receives to post at a time
+    #[clap(short = 'r', long, default_value = "500")]
+    rx_depth: usize,
 }
 
 fn main() -> Result<()> {
@@ -48,15 +58,50 @@ fn main() -> Result<()> {
         None => info!("run server"),
     }
 
-    let buf: Vec<u8> = {
+    run(&args, server)
+}
+
+fn run(args: &Args, server: Option<SocketAddr>) -> Result<()> {
+    let mut buf: Vec<u8> = {
         assert_ne!(args.size, 0);
         vec![0xcc; args.size]
     };
 
-    let ctx = {
+    let ctx: _ = {
         let dev_list = DeviceList::available()?;
         let dev = choose_device(&dev_list, args.ib_dev.as_deref())?;
         Context::open(dev)?
+    };
+
+    let cc = CompChannel::create(&ctx)?;
+
+    let pd = ProtectionDomain::alloc(&ctx)?;
+
+    let mr = unsafe {
+        let addr = buf.as_mut_ptr();
+        let length = buf.len();
+        let access_flags = AccessFlags::LOCAL_WRITE;
+        MemoryRegion::register(&pd, addr, length, access_flags)?
+    };
+
+    let cq = {
+        let mut options = CompletionQueue::options();
+        options.cqe(args.rx_depth.checked_add(1).unwrap());
+        options.channel(&cc);
+        CompletionQueue::create(&ctx, options)?
+    };
+
+    let qp = {
+        let mut options = QueuePair::options();
+        options
+            .send_cq(&cq)
+            .recv_cq(&cq)
+            .max_send_wr(1)
+            .max_recv_wr(args.rx_depth.numeric_cast())
+            .max_send_sge(1)
+            .max_recv_sge(1)
+            .qp_type(QueuePairType::RC);
+        QueuePair::create(&pd, options)?
     };
 
     Ok(())
