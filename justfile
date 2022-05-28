@@ -23,3 +23,7 @@ sync-version:
         cargo set-version $vers
         popd > /dev/null
     done
+
+install-examples:
+    cargo install --offline --path examples/rdma-devices
+    cargo install --offline --path examples/rdma-rcpp
