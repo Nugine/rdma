@@ -7,6 +7,7 @@ use std::mem;
 use std::ops::Not;
 use std::ptr;
 
+#[inline]
 pub unsafe fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
     cq.cast()
 }
@@ -43,10 +44,12 @@ macro_rules! container_of {
     }};
 }
 
+#[inline(always)]
 unsafe fn set_errno(errno: i32) {
     __errno_location().write(errno)
 }
 
+#[inline]
 unsafe fn verbs_get_ctx(ctx: *mut ibv_context) -> *mut verbs_context {
     if (*ctx).abi_compat != mem::transmute::<_, *mut c_void>(usize::MAX) {
         return ptr::null_mut();
@@ -68,6 +71,7 @@ macro_rules! verbs_get_ctx_op {
     }};
 }
 
+#[inline]
 pub unsafe fn ibv_create_cq_ex(
     context: *mut ibv_context,
     cq_attr: *mut ibv_cq_init_attr_ex,
@@ -77,10 +81,11 @@ pub unsafe fn ibv_create_cq_ex(
         set_errno(EOPNOTSUPP);
         return ptr::null_mut();
     }
-    let op = (*vctx).create_cq_ex.unwrap_unchecked();
+    let op: _ = (*vctx).create_cq_ex.unwrap_unchecked();
     (op)(context, cq_attr)
 }
 
+#[inline]
 pub unsafe fn ibv_query_gid_ex(
     context: *mut ibv_context,
     port_num: u32,
@@ -110,6 +115,7 @@ mod compat {
     }
 }
 
+#[inline]
 pub unsafe fn ibv_query_port(
     context: *mut ibv_context,
     port_num: u8,
@@ -129,6 +135,7 @@ pub unsafe fn ibv_query_port(
     )
 }
 
+#[inline]
 pub unsafe fn ibv_query_device_ex(
     context: *mut ibv_context,
     input: *const ibv_query_device_ex_input,
@@ -156,6 +163,7 @@ pub unsafe fn ibv_query_device_ex(
     ret
 }
 
+#[inline]
 pub unsafe fn ibv_create_qp_ex(
     context: *mut ibv_context,
     qp_attr: *mut ibv_qp_init_attr_ex,
@@ -174,18 +182,21 @@ pub unsafe fn ibv_create_qp_ex(
     (op)(context, qp_attr)
 }
 
+#[inline]
 pub unsafe fn ibv_req_notify_cq(cq: *mut ibv_cq, solicited_only: c_int) -> c_int {
     let ctx: *mut ibv_context = (*cq).context;
     let op: _ = (*ctx).ops.req_notify_cq.unwrap_unchecked();
     (op)(cq, solicited_only)
 }
 
+#[inline]
 pub unsafe fn ibv_poll_cq(cq: *mut ibv_cq, num_entries: c_int, wc: *mut ibv_wc) -> c_int {
     let ctx: *mut ibv_context = (*cq).context;
     let op: _ = (*ctx).ops.poll_cq.unwrap_unchecked();
     (op)(cq, num_entries, wc)
 }
 
+#[inline]
 pub unsafe fn ibv_alloc_mw(pd: *mut ibv_pd, mw_type: ibv_mw_type) -> *mut ibv_mw {
     let ctx: *mut ibv_context = (*pd).context;
     let op: _ = (*ctx).ops.alloc_mw;
@@ -197,12 +208,14 @@ pub unsafe fn ibv_alloc_mw(pd: *mut ibv_pd, mw_type: ibv_mw_type) -> *mut ibv_mw
     (op)(pd, mw_type)
 }
 
+#[inline]
 pub unsafe fn ibv_dealloc_mw(mw: *mut ibv_mw) -> c_int {
     let ctx: *mut ibv_context = (*mw).context;
     let op: _ = (*ctx).ops.dealloc_mw.unwrap_unchecked();
     (op)(mw)
 }
 
+#[inline]
 pub unsafe fn ibv_bind_mw(qp: *mut ibv_qp, mw: *mut ibv_mw, mw_bind: *mut ibv_mw_bind) -> c_int {
     {
         let mw = &*mw;
@@ -226,6 +239,7 @@ pub unsafe fn ibv_bind_mw(qp: *mut ibv_qp, mw: *mut ibv_mw, mw_bind: *mut ibv_mw
     }
 }
 
+#[inline]
 pub unsafe fn ibv_alloc_dm(context: *mut ibv_context, attr: *mut ibv_alloc_dm_attr) -> *mut ibv_dm {
     let vctx: *mut verbs_context = verbs_get_ctx_op!(context, alloc_dm);
 
@@ -238,6 +252,7 @@ pub unsafe fn ibv_alloc_dm(context: *mut ibv_context, attr: *mut ibv_alloc_dm_at
     (op)(context, attr)
 }
 
+#[inline]
 pub unsafe fn ibv_free_dm(dm: *mut ibv_dm) -> c_int {
     let vctx: *mut verbs_context = verbs_get_ctx_op!((*dm).context, free_dm);
 
@@ -249,6 +264,7 @@ pub unsafe fn ibv_free_dm(dm: *mut ibv_dm) -> c_int {
     (op)(dm)
 }
 
+#[inline]
 pub unsafe fn ibv_post_send(
     qp: *mut ibv_qp,
     wr: *mut ibv_send_wr,
@@ -259,6 +275,7 @@ pub unsafe fn ibv_post_send(
     (op)(qp, wr, bad_wr)
 }
 
+#[inline]
 pub unsafe fn ibv_post_recv(
     qp: *mut ibv_qp,
     wr: *mut ibv_recv_wr,
