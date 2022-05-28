@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use tracing::info;
 
 #[derive(Debug, clap::Parser)]
 struct Opt {
@@ -26,15 +27,19 @@ fn main() -> Result<()> {
     if env::var("RUST_BACKTRACE").is_err() {
         env::set_var("RUST_BACKTRACE", "full")
     }
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "rdma_rcpp=trace,rdma=trace")
+    }
+
+    tracing_subscriber::fmt::init();
 
     let Opt { args, server } = Opt::parse();
 
-    println!("args: {:#?}", args);
+    info!("args:\n{:#?}", args);
 
-    if server.is_some() {
-        println!("run server")
-    } else {
-        println!("run client")
+    match server {
+        Some(server) => info!(?server, "run client"),
+        None => info!("run server"),
     }
 
     let ctx = {
