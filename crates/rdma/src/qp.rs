@@ -8,6 +8,7 @@ use crate::utils::{bool_to_c_int, c_uint_to_u32, u32_as_c_uint};
 use crate::utils::{usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
 
+use std::mem::MaybeUninit;
 use std::os::raw::{c_int, c_uint};
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
@@ -132,7 +133,7 @@ impl QueuePair {
         // SAFETY: ffi
         unsafe {
             let attr_mask: c_int = mem::transmute(options.mask);
-            let attr = &mut options.attr;
+            let attr = options.attr.as_mut_ptr();
             let ret = C::ibv_modify_qp(qp, attr, attr_mask);
             if ret != 0 {
                 return Err(from_errno(ret));
@@ -298,39 +299,62 @@ impl QueuePairType {
 #[repr(C)]
 pub struct ModifyOptions {
     mask: C::ibv_qp_attr_mask,
-    attr: C::ibv_qp_attr,
+    attr: MaybeUninit<C::ibv_qp_attr>,
 }
 
 impl Default for ModifyOptions {
     #[inline]
     fn default() -> Self {
         // SAFETY: POD ffi type
-        unsafe { mem::zeroed() }
+        Self {
+            mask: 0,
+            attr: MaybeUninit::uninit(),
+        }
     }
 }
 
 impl ModifyOptions {
     #[inline]
     pub fn qp_state(&mut self, qp_state: QueuePairState) -> &mut Self {
-        self.attr.qp_state = qp_state.to_c_uint();
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).qp_state);
+            p.write(qp_state.to_c_uint());
+        }
+        self.mask |= C::IBV_QP_STATE;
         self
     }
 
     #[inline]
     pub fn pkey_index(&mut self, pkey_index: u16) -> &mut Self {
-        self.attr.pkey_index = pkey_index;
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).pkey_index);
+            p.write(pkey_index);
+        }
+        self.mask |= C::IBV_QP_PKEY_INDEX;
         self
     }
 
     #[inline]
     pub fn port_num(&mut self, port_num: u8) -> &mut Self {
-        self.attr.port_num = port_num;
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).port_num);
+            p.write(port_num);
+        }
+        self.mask |= C::IBV_QP_PORT;
         self
     }
 
     #[inline]
     pub fn qp_access_flags(&mut self, access_flags: AccessFlags) -> &mut Self {
-        self.attr.qp_access_flags = access_flags.to_c_uint();
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).qp_access_flags);
+            p.write(access_flags.to_c_uint());
+        }
+        self.mask |= C::IBV_QP_ACCESS_FLAGS;
         self
     }
 }
