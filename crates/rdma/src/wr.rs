@@ -1,4 +1,4 @@
-use crate::bindings::{ibv_recv_wr, ibv_send_wr, ibv_sge};
+use crate::bindings as C;
 
 use std::mem;
 use std::os::raw::c_int;
@@ -6,23 +6,23 @@ use std::os::raw::c_int;
 use numeric_cast::NumericCast;
 
 #[repr(transparent)]
-pub struct SendRequest(ibv_send_wr);
+pub struct SendRequest(C::ibv_send_wr);
 
 /// SAFETY: ffi pointer data
-/// the actual usage is unsafe (`ibv_post_send`)
+/// the actual usage is unsafe (`C::ibv_post_send`)
 unsafe impl Send for SendRequest {}
 /// SAFETY: ffi pointer data
-/// the actual usage is unsafe (`ibv_post_send`)
+/// the actual usage is unsafe (`C::ibv_post_send`)
 unsafe impl Sync for SendRequest {}
 
 #[repr(transparent)]
-pub struct RecvRequest(ibv_recv_wr);
+pub struct RecvRequest(C::ibv_recv_wr);
 
 /// SAFETY: ffi pointer data
-/// the actual usage is unsafe (`ibv_post_recv`)
+/// the actual usage is unsafe (`C::ibv_post_recv`)
 unsafe impl Send for RecvRequest {}
 /// SAFETY: ffi pointer data
-/// the actual usage is unsafe (`ibv_post_recv`)
+/// the actual usage is unsafe (`C::ibv_post_recv`)
 unsafe impl Sync for RecvRequest {}
 
 #[repr(C)]
@@ -34,14 +34,14 @@ pub struct Sge {
 
 // layout test
 const _: () = {
-    assert!(mem::size_of::<Sge>() == mem::size_of::<ibv_sge>());
-    assert!(mem::align_of::<Sge>() == mem::align_of::<ibv_sge>());
+    assert!(mem::size_of::<Sge>() == mem::size_of::<C::ibv_sge>());
+    assert!(mem::align_of::<Sge>() == mem::align_of::<C::ibv_sge>());
     let sge = Sge {
         addr: 0,
         length: 0,
         lkey: 0,
     };
-    let _ = ibv_sge {
+    let _ = C::ibv_sge {
         addr: sge.addr,
         length: sge.length,
         lkey: sge.lkey,
@@ -79,7 +79,7 @@ impl SendRequest {
     #[inline]
     pub fn sg_list(&mut self, sg_list: &mut [Sge]) -> &mut Self {
         self.0.num_sge = sg_list.len().numeric_cast::<c_int>();
-        self.0.sg_list = sg_list.as_mut_ptr().cast::<ibv_sge>();
+        self.0.sg_list = sg_list.as_mut_ptr().cast::<C::ibv_sge>();
         self
     }
 }
@@ -108,7 +108,7 @@ impl RecvRequest {
     #[inline]
     pub fn sg_list(&mut self, sg_list: &mut [Sge]) -> &mut Self {
         self.0.num_sge = sg_list.len().numeric_cast::<c_int>();
-        self.0.sg_list = sg_list.as_mut_ptr().cast::<ibv_sge>();
+        self.0.sg_list = sg_list.as_mut_ptr().cast::<C::ibv_sge>();
         self
     }
 }

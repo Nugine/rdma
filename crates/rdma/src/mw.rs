@@ -1,10 +1,8 @@
+use crate::bindings as C;
 use crate::error::create_resource;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::utils::c_uint_to_u32;
-
-use crate::bindings::{ibv_alloc_mw, ibv_dealloc_mw, ibv_mw};
-use crate::bindings::{IBV_MW_TYPE_1, IBV_MW_TYPE_2};
 
 use std::io;
 use std::os::raw::c_uint;
@@ -29,7 +27,7 @@ impl MemoryWindow {
         let owner = unsafe {
             let mw_type = mw_type.to_c_uint();
             let mw = create_resource(
-                || ibv_alloc_mw(pd.ffi_ptr(), mw_type),
+                || C::ibv_alloc_mw(pd.ffi_ptr(), mw_type),
                 || "failed to allocate memory window",
             )?;
             Arc::new(Owner {
@@ -42,7 +40,7 @@ impl MemoryWindow {
 }
 
 pub(crate) struct Owner {
-    mw: NonNull<ibv_mw>,
+    mw: NonNull<C::ibv_mw>,
     _pd: Arc<pd::Owner>,
 }
 
@@ -52,7 +50,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    fn ffi_ptr(&self) -> *mut ibv_mw {
+    fn ffi_ptr(&self) -> *mut C::ibv_mw {
         self.mw.as_ptr()
     }
 }
@@ -62,7 +60,7 @@ impl Drop for Owner {
         // SAFETY: ffi
         unsafe {
             let mw = self.ffi_ptr();
-            let ret = ibv_dealloc_mw(mw);
+            let ret = C::ibv_dealloc_mw(mw);
             assert_eq!(ret, 0);
         }
     }
@@ -71,8 +69,8 @@ impl Drop for Owner {
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum MemoryWindowType {
-    Type1 = c_uint_to_u32(IBV_MW_TYPE_1),
-    Type2 = c_uint_to_u32(IBV_MW_TYPE_2),
+    Type1 = c_uint_to_u32(C::IBV_MW_TYPE_1),
+    Type2 = c_uint_to_u32(C::IBV_MW_TYPE_2),
 }
 
 impl MemoryWindowType {

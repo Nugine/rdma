@@ -1,10 +1,8 @@
+use crate::bindings as C;
 use crate::ctx::{self, Context};
 use crate::error::create_resource;
 use crate::qp::{QueuePair, QueuePairOptions};
 use crate::resource::Resource;
-
-use crate::bindings::ibv_pd;
-use crate::bindings::{ibv_alloc_pd, ibv_dealloc_pd};
 
 use std::io;
 use std::ptr::NonNull;
@@ -23,7 +21,7 @@ unsafe impl Resource for ProtectionDomain {
 }
 
 impl ProtectionDomain {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_pd {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_pd {
         self.0.ffi_ptr()
     }
 
@@ -32,7 +30,7 @@ impl ProtectionDomain {
         // SAFETY: ffi
         let owner = unsafe {
             let pd = create_resource(
-                || ibv_alloc_pd(ctx.ffi_ptr()),
+                || C::ibv_alloc_pd(ctx.ffi_ptr()),
                 || "failed to allocate protection domain",
             )?;
             Arc::new(Owner {
@@ -50,7 +48,7 @@ impl ProtectionDomain {
 }
 
 pub(crate) struct Owner {
-    pd: NonNull<ibv_pd>,
+    pd: NonNull<C::ibv_pd>,
 
     _ctx: Arc<ctx::Owner>,
 }
@@ -61,7 +59,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_pd {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_pd {
         self.pd.as_ptr()
     }
 }
@@ -71,7 +69,7 @@ impl Drop for Owner {
         // SAFETY: ffi
         unsafe {
             let pd = self.ffi_ptr();
-            let ret = ibv_dealloc_pd(pd);
+            let ret = C::ibv_dealloc_pd(pd);
             assert_eq!(ret, 0);
         }
     }

@@ -1,15 +1,10 @@
+use crate::bindings as C;
 use crate::cc::{self, CompChannel};
 use crate::ctx::{self, Context};
 use crate::error::{create_resource, from_errno};
 use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, ptr_as_mut};
 use crate::wc::WorkCompletion;
-
-use crate::bindings::ibv_cq_ex_to_cq;
-use crate::bindings::{ibv_ack_cq_events, ibv_req_notify_cq};
-use crate::bindings::{ibv_cq_ex, ibv_cq_init_attr_ex};
-use crate::bindings::{ibv_create_cq_ex, ibv_destroy_cq};
-use crate::bindings::{ibv_poll_cq, ibv_wc};
 
 use std::mem::{self, ManuallyDrop, MaybeUninit};
 use std::os::raw::{c_int, c_uint, c_void};
@@ -34,7 +29,7 @@ unsafe impl Resource for CompletionQueue {
 }
 
 impl CompletionQueue {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_cq_ex {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_cq_ex {
         self.0.ffi_ptr()
     }
 
@@ -50,7 +45,7 @@ impl CompletionQueue {
         let owner = unsafe {
             let context = ctx.ffi_ptr();
 
-            let mut cq_attr: ibv_cq_init_attr_ex = mem::zeroed();
+            let mut cq_attr: C::ibv_cq_init_attr_ex = mem::zeroed();
             cq_attr.cqe = options.cqe.numeric_cast();
 
             if let Some(ref cc) = options.channel {
@@ -58,7 +53,7 @@ impl CompletionQueue {
             }
 
             let cq = create_resource(
-                || ibv_create_cq_ex(context, &mut cq_attr),
+                || C::ibv_create_cq_ex(context, &mut cq_attr),
                 || "failed to create completion queue",
             )?;
 
@@ -109,7 +104,7 @@ impl CompletionQueue {
         // SAFETY: ffi
         let ret = unsafe {
             let solicited_only = bool_to_c_int(solicited_only);
-            ibv_req_notify_cq(ibv_cq_ex_to_cq(cq), solicited_only)
+            C::ibv_req_notify_cq(C::ibv_cq_ex_to_cq(cq), solicited_only)
         };
         if ret != 0 {
             return Err(from_errno(ret));
@@ -140,9 +135,9 @@ impl CompletionQueue {
         // SAFETY: ffi
         unsafe {
             let num_entries: c_int = buf.len().numeric_cast();
-            let wc = buf.as_mut_ptr().cast::<ibv_wc>();
-            let cq = ibv_cq_ex_to_cq(self.ffi_ptr());
-            let ret = ibv_poll_cq(cq, num_entries, wc);
+            let wc = buf.as_mut_ptr().cast::<C::ibv_wc>();
+            let cq = C::ibv_cq_ex_to_cq(self.ffi_ptr());
+            let ret = C::ibv_poll_cq(cq, num_entries, wc);
             if ret < 0 {
                 return Err(from_errno(ret.wrapping_neg()));
             }
@@ -154,7 +149,7 @@ impl CompletionQueue {
 }
 
 pub(crate) struct Owner {
-    cq: NonNull<ibv_cq_ex>,
+    cq: NonNull<C::ibv_cq_ex>,
     user_data: usize,
     comp_events_completed: AtomicU32,
 
@@ -168,7 +163,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_cq_ex {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_cq_ex {
         self.cq.as_ptr()
     }
 }
@@ -181,13 +176,13 @@ impl Drop for Owner {
 
         // SAFETY: ffi
         unsafe {
-            let cq = ibv_cq_ex_to_cq(self.ffi_ptr());
+            let cq = C::ibv_cq_ex_to_cq(self.ffi_ptr());
 
             let comp_ack: c_uint = self.comp_events_completed.load(Relaxed).numeric_cast();
             // if the number overflows, the behavior is unspecified
-            ibv_ack_cq_events(cq, comp_ack);
+            C::ibv_ack_cq_events(cq, comp_ack);
 
-            let ret = ibv_destroy_cq(cq);
+            let ret = C::ibv_destroy_cq(cq);
             assert_eq!(ret, 0);
         };
     }

@@ -1,3 +1,4 @@
+use crate::bindings as C;
 use crate::cc::CompChannel;
 use crate::cq::{CompletionQueue, CompletionQueueOptions};
 use crate::device::Device;
@@ -7,9 +8,6 @@ use crate::query::DeviceAttr;
 use crate::query::GidEntry;
 use crate::query::PortAttr;
 use crate::resource::Resource;
-
-use crate::bindings::ibv_context;
-use crate::bindings::{ibv_close_device, ibv_open_device};
 
 use std::io;
 use std::ptr::NonNull;
@@ -28,7 +26,7 @@ unsafe impl Resource for Context {
 }
 
 impl Context {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_context {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_context {
         self.0.ffi_ptr()
     }
 
@@ -37,7 +35,7 @@ impl Context {
         // SAFETY: ffi
         let owner = unsafe {
             let ctx = create_resource(
-                || ibv_open_device(device.ffi_ptr()),
+                || C::ibv_open_device(device.ffi_ptr()),
                 || "failed to open device",
             )?;
             Arc::new(Owner { ctx })
@@ -77,7 +75,7 @@ impl Context {
 }
 
 pub(crate) struct Owner {
-    ctx: NonNull<ibv_context>,
+    ctx: NonNull<C::ibv_context>,
 }
 
 /// SAFETY: owned type
@@ -86,7 +84,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    fn ffi_ptr(&self) -> *mut ibv_context {
+    fn ffi_ptr(&self) -> *mut C::ibv_context {
         self.ctx.as_ptr()
     }
 }
@@ -96,7 +94,7 @@ impl Drop for Owner {
         // SAFETY: ffi
         unsafe {
             let context = self.ffi_ptr();
-            let ret = ibv_close_device(context);
+            let ret = C::ibv_close_device(context);
             assert_eq!(ret, 0);
         }
     }

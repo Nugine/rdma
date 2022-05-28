@@ -1,10 +1,6 @@
+use crate::bindings as C;
 use crate::ctx::Context;
 use crate::error::last_error;
-
-use crate::bindings::__be64;
-use crate::bindings::ibv_device;
-use crate::bindings::{ibv_free_device_list, ibv_get_device_list};
-use crate::bindings::{ibv_get_device_guid, ibv_get_device_name};
 
 use std::ffi::CStr;
 use std::io;
@@ -30,7 +26,7 @@ unsafe impl Sync for DeviceList {}
 
 /// A RDMA device
 #[repr(transparent)]
-pub struct Device(NonNull<ibv_device>);
+pub struct Device(NonNull<C::ibv_device>);
 
 /// SAFETY: owned type
 unsafe impl Send for Device {}
@@ -40,10 +36,10 @@ unsafe impl Sync for Device {}
 /// A RDMA device guid
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct Guid(__be64);
+pub struct Guid(C::__be64);
 
 impl DeviceList {
-    fn ffi_ptr(&self) -> *mut *mut ibv_device {
+    fn ffi_ptr(&self) -> *mut *mut C::ibv_device {
         self.arr.as_ptr().cast()
     }
 
@@ -57,7 +53,7 @@ impl DeviceList {
         // SAFETY: ffi
         unsafe {
             let mut num_devices: c_int = 0;
-            let arr = ibv_get_device_list(&mut num_devices);
+            let arr = C::ibv_get_device_list(&mut num_devices);
             if arr.is_null() {
                 return Err(last_error());
             }
@@ -65,12 +61,12 @@ impl DeviceList {
             // SAFETY: repr(transparent)
             let arr: NonNull<Device> = NonNull::new_unchecked(arr.cast());
 
-            let _guard = guard_on_unwind((), |()| ibv_free_device_list(arr.as_ptr().cast()));
+            let _guard = guard_on_unwind((), |()| C::ibv_free_device_list(arr.as_ptr().cast()));
 
             let len: usize = num_devices.numeric_cast();
 
             if mem::size_of::<c_int>() >= mem::size_of::<usize>() {
-                let total_size = len.saturating_mul(mem::size_of::<*mut ibv_device>());
+                let total_size = len.saturating_mul(mem::size_of::<*mut C::ibv_device>());
                 assert!(total_size < usize::MAX.wrapping_div(2));
             }
 
@@ -91,7 +87,7 @@ impl Drop for DeviceList {
     #[inline]
     fn drop(&mut self) {
         // SAFETY: ffi
-        unsafe { ibv_free_device_list(self.ffi_ptr()) }
+        unsafe { C::ibv_free_device_list(self.ffi_ptr()) }
     }
 }
 
@@ -112,7 +108,7 @@ impl fmt::Debug for DeviceList {
 }
 
 impl Device {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_device {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_device {
         self.0.as_ptr()
     }
 
@@ -121,7 +117,7 @@ impl Device {
     #[must_use]
     pub fn c_name(&self) -> &CStr {
         // SAFETY: ffi
-        unsafe { CStr::from_ptr(ibv_get_device_name(self.ffi_ptr())) }
+        unsafe { CStr::from_ptr(C::ibv_get_device_name(self.ffi_ptr())) }
     }
 
     /// Returns kernel device name
@@ -139,7 +135,7 @@ impl Device {
     #[must_use]
     pub fn guid(&self) -> Guid {
         // SAFETY: ffi
-        unsafe { Guid(ibv_get_device_guid(self.ffi_ptr())) }
+        unsafe { Guid(C::ibv_get_device_guid(self.ffi_ptr())) }
     }
 
     #[inline]

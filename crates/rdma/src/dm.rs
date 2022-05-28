@@ -1,8 +1,7 @@
+use crate::bindings as C;
 use crate::ctx::{self, Context};
 use crate::error::create_resource;
 use crate::resource::Resource;
-
-use crate::bindings::{ibv_alloc_dm, ibv_alloc_dm_attr, ibv_dm, ibv_free_dm};
 
 use std::ptr::NonNull;
 use std::sync::Arc;
@@ -33,7 +32,7 @@ impl DeviceMemory {
         let owner = unsafe {
             let mut attr = options.attr;
             let dm = create_resource(
-                || ibv_alloc_dm(ctx.ffi_ptr(), &mut attr),
+                || C::ibv_alloc_dm(ctx.ffi_ptr(), &mut attr),
                 || "failed to allocate device memory",
             )?;
             Arc::new(Owner {
@@ -46,7 +45,7 @@ impl DeviceMemory {
 }
 
 pub(crate) struct Owner {
-    dm: NonNull<ibv_dm>,
+    dm: NonNull<C::ibv_dm>,
     _ctx: Arc<ctx::Owner>,
 }
 
@@ -56,7 +55,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    fn ffi_ptr(&self) -> *mut ibv_dm {
+    fn ffi_ptr(&self) -> *mut C::ibv_dm {
         self.dm.as_ptr()
     }
 }
@@ -66,14 +65,14 @@ impl Drop for Owner {
         // SAFETY: ffi
         unsafe {
             let dm = self.ffi_ptr();
-            let ret = ibv_free_dm(dm);
+            let ret = C::ibv_free_dm(dm);
             assert_eq!(ret, 0);
         }
     }
 }
 
 pub struct DeviceMemoryOptions {
-    attr: ibv_alloc_dm_attr,
+    attr: C::ibv_alloc_dm_attr,
 }
 
 impl Default for DeviceMemoryOptions {

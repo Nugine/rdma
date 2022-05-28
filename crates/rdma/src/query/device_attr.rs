@@ -1,24 +1,22 @@
+use crate::bindings as C;
 use crate::ctx::Context;
 use crate::error::from_errno;
 use crate::utils::{box_assume_init, box_new_uninit};
 
-use crate::bindings::ibv_device_attr_ex;
-use crate::bindings::ibv_query_device_ex;
-
 use std::io;
 use std::ptr;
 
-pub struct DeviceAttr(Box<ibv_device_attr_ex>);
+pub struct DeviceAttr(Box<C::ibv_device_attr_ex>);
 
 impl DeviceAttr {
     #[inline]
     pub fn query(ctx: &Context) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let mut device_attr = box_new_uninit::<ibv_device_attr_ex>();
+            let mut device_attr = box_new_uninit::<C::ibv_device_attr_ex>();
             let context = ctx.ffi_ptr();
             let input = ptr::null();
-            let ret = ibv_query_device_ex(context, input, device_attr.as_mut_ptr());
+            let ret = C::ibv_query_device_ex(context, input, device_attr.as_mut_ptr());
             if ret != 0 {
                 return Err(from_errno(ret));
             }

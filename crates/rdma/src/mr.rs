@@ -1,20 +1,8 @@
+use crate::bindings as C;
 use crate::error::create_resource;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::utils::c_uint_to_u32;
-
-use crate::bindings::{ibv_dereg_mr, ibv_mr, ibv_reg_mr};
-use crate::bindings::{
-    IBV_ACCESS_HUGETLB,          //
-    IBV_ACCESS_LOCAL_WRITE,      //
-    IBV_ACCESS_MW_BIND,          //
-    IBV_ACCESS_ON_DEMAND,        //
-    IBV_ACCESS_RELAXED_ORDERING, //
-    IBV_ACCESS_REMOTE_ATOMIC,    //
-    IBV_ACCESS_REMOTE_READ,      //
-    IBV_ACCESS_REMOTE_WRITE,     //
-    IBV_ACCESS_ZERO_BASED,       //
-};
 
 use std::io;
 use std::os::raw::{c_uint, c_void};
@@ -35,7 +23,7 @@ unsafe impl Resource for MemoryRegion {
 }
 
 impl MemoryRegion {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_mr {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_mr {
         self.0.ffi_ptr()
     }
 
@@ -56,7 +44,7 @@ impl MemoryRegion {
             let addr: *mut c_void = addr.cast();
             let access_flags = access_flags.to_c_uint();
             let mr = create_resource(
-                || ibv_reg_mr(pd.ffi_ptr(), addr, length, access_flags),
+                || C::ibv_reg_mr(pd.ffi_ptr(), addr, length, access_flags),
                 || "failed to register memory region",
             )?;
             Arc::new(Owner {
@@ -101,7 +89,7 @@ impl MemoryRegion {
 }
 
 pub(crate) struct Owner {
-    mr: NonNull<ibv_mr>,
+    mr: NonNull<C::ibv_mr>,
 
     _pd: Arc<pd::Owner>,
 }
@@ -112,7 +100,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_mr {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_mr {
         self.mr.as_ptr()
     }
 }
@@ -122,7 +110,7 @@ impl Drop for Owner {
         // SAFETY: ffi
         unsafe {
             let mr = self.ffi_ptr();
-            let ret = ibv_dereg_mr(mr);
+            let ret = C::ibv_dereg_mr(mr);
             assert_eq!(ret, 0);
         }
     }
@@ -130,15 +118,15 @@ impl Drop for Owner {
 
 bitflags! {
     pub struct AccessFlags: u32 {
-        const LOCAL_WRITE       = c_uint_to_u32(IBV_ACCESS_LOCAL_WRITE);
-        const REMOTE_WRITE      = c_uint_to_u32(IBV_ACCESS_REMOTE_WRITE);
-        const REMOTE_READ       = c_uint_to_u32(IBV_ACCESS_REMOTE_READ);
-        const REMOTE_ATOMIC     = c_uint_to_u32(IBV_ACCESS_REMOTE_ATOMIC);
-        const MW_BIND           = c_uint_to_u32(IBV_ACCESS_MW_BIND);
-        const ZERO_BASED        = c_uint_to_u32(IBV_ACCESS_ZERO_BASED);
-        const ON_DEMAND         = c_uint_to_u32(IBV_ACCESS_ON_DEMAND);
-        const HUGETLB           = c_uint_to_u32(IBV_ACCESS_HUGETLB);
-        const RELAXED_ORDERING  = c_uint_to_u32(IBV_ACCESS_RELAXED_ORDERING);
+        const LOCAL_WRITE       = c_uint_to_u32(C::IBV_ACCESS_LOCAL_WRITE);
+        const REMOTE_WRITE      = c_uint_to_u32(C::IBV_ACCESS_REMOTE_WRITE);
+        const REMOTE_READ       = c_uint_to_u32(C::IBV_ACCESS_REMOTE_READ);
+        const REMOTE_ATOMIC     = c_uint_to_u32(C::IBV_ACCESS_REMOTE_ATOMIC);
+        const MW_BIND           = c_uint_to_u32(C::IBV_ACCESS_MW_BIND);
+        const ZERO_BASED        = c_uint_to_u32(C::IBV_ACCESS_ZERO_BASED);
+        const ON_DEMAND         = c_uint_to_u32(C::IBV_ACCESS_ON_DEMAND);
+        const HUGETLB           = c_uint_to_u32(C::IBV_ACCESS_HUGETLB);
+        const RELAXED_ORDERING  = c_uint_to_u32(C::IBV_ACCESS_RELAXED_ORDERING);
     }
 }
 

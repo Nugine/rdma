@@ -1,3 +1,4 @@
+use crate::bindings as C;
 use crate::ctx::Context;
 use crate::error::from_errno;
 use crate::utils::{box_assume_init, box_new_uninit, c_uint_to_u32};
@@ -5,24 +6,9 @@ use crate::utils::{box_assume_init, box_new_uninit, c_uint_to_u32};
 use std::io;
 use std::os::raw::c_uint;
 
-use crate::bindings::{ibv_port_attr, ibv_query_port};
-use crate::bindings::{
-    IBV_LINK_LAYER_ETHERNET,    //
-    IBV_LINK_LAYER_INFINIBAND,  //
-    IBV_LINK_LAYER_UNSPECIFIED, //
-};
-use crate::bindings::{
-    IBV_PORT_ACTIVE,       //
-    IBV_PORT_ACTIVE_DEFER, //
-    IBV_PORT_ARMED,        //
-    IBV_PORT_DOWN,         //
-    IBV_PORT_INIT,         //
-    IBV_PORT_NOP,          //
-};
-
 use numeric_cast::NumericCast;
 
-pub struct PortAttr(Box<ibv_port_attr>);
+pub struct PortAttr(Box<C::ibv_port_attr>);
 
 impl PortAttr {
     #[inline]
@@ -31,9 +17,9 @@ impl PortAttr {
 
         // SAFETY: ffi
         unsafe {
-            let mut port_attr = box_new_uninit::<ibv_port_attr>();
+            let mut port_attr = box_new_uninit::<C::ibv_port_attr>();
             let context = ctx.ffi_ptr();
-            let ret = ibv_query_port(context, port_num, port_attr.as_mut_ptr());
+            let ret = C::ibv_query_port(context, port_num, port_attr.as_mut_ptr());
             if ret != 0 {
                 return Err(from_errno(ret));
             }
@@ -63,23 +49,23 @@ impl PortAttr {
 #[derive(Debug)]
 #[repr(u32)]
 pub enum PortState {
-    Nop = c_uint_to_u32(IBV_PORT_NOP),
-    Down = c_uint_to_u32(IBV_PORT_DOWN),
-    Init = c_uint_to_u32(IBV_PORT_INIT),
-    Armed = c_uint_to_u32(IBV_PORT_ARMED),
-    Active = c_uint_to_u32(IBV_PORT_ACTIVE),
-    ActiveDefer = c_uint_to_u32(IBV_PORT_ACTIVE_DEFER),
+    Nop = c_uint_to_u32(C::IBV_PORT_NOP),
+    Down = c_uint_to_u32(C::IBV_PORT_DOWN),
+    Init = c_uint_to_u32(C::IBV_PORT_INIT),
+    Armed = c_uint_to_u32(C::IBV_PORT_ARMED),
+    Active = c_uint_to_u32(C::IBV_PORT_ACTIVE),
+    ActiveDefer = c_uint_to_u32(C::IBV_PORT_ACTIVE_DEFER),
 }
 
 impl PortState {
     fn from_c_uint(val: c_uint) -> PortState {
         match val {
-            IBV_PORT_NOP => PortState::Nop,
-            IBV_PORT_DOWN => PortState::Down,
-            IBV_PORT_INIT => PortState::Init,
-            IBV_PORT_ARMED => PortState::Armed,
-            IBV_PORT_ACTIVE => PortState::Active,
-            IBV_PORT_ACTIVE_DEFER => PortState::ActiveDefer,
+            C::IBV_PORT_NOP => PortState::Nop,
+            C::IBV_PORT_DOWN => PortState::Down,
+            C::IBV_PORT_INIT => PortState::Init,
+            C::IBV_PORT_ARMED => PortState::Armed,
+            C::IBV_PORT_ACTIVE => PortState::Active,
+            C::IBV_PORT_ACTIVE_DEFER => PortState::ActiveDefer,
             _ => panic!("unknown state"),
         }
     }
@@ -88,17 +74,17 @@ impl PortState {
 #[derive(Debug)]
 #[repr(u32)]
 pub enum LinkLayer {
-    Ethernet = c_uint_to_u32(IBV_LINK_LAYER_ETHERNET),
-    Infiniband = c_uint_to_u32(IBV_LINK_LAYER_INFINIBAND),
-    Unspecified = c_uint_to_u32(IBV_LINK_LAYER_UNSPECIFIED),
+    Ethernet = c_uint_to_u32(C::IBV_LINK_LAYER_ETHERNET),
+    Infiniband = c_uint_to_u32(C::IBV_LINK_LAYER_INFINIBAND),
+    Unspecified = c_uint_to_u32(C::IBV_LINK_LAYER_UNSPECIFIED),
 }
 
 impl LinkLayer {
     fn from_c_uint(val: c_uint) -> LinkLayer {
         match val {
-            IBV_LINK_LAYER_ETHERNET => LinkLayer::Ethernet,
-            IBV_LINK_LAYER_INFINIBAND => LinkLayer::Infiniband,
-            IBV_LINK_LAYER_UNSPECIFIED => LinkLayer::Unspecified,
+            C::IBV_LINK_LAYER_ETHERNET => LinkLayer::Ethernet,
+            C::IBV_LINK_LAYER_INFINIBAND => LinkLayer::Infiniband,
+            C::IBV_LINK_LAYER_UNSPECIFIED => LinkLayer::Unspecified,
             _ => panic!("unknown link layer"),
         }
     }

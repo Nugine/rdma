@@ -1,4 +1,4 @@
-use crate::bindings::ibv_wc;
+use crate::bindings as C;
 
 #[repr(transparent)]
-pub struct WorkCompletion(ibv_wc);
+pub struct WorkCompletion(C::ibv_wc);

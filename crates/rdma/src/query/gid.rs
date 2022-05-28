@@ -1,16 +1,14 @@
+use crate::bindings as C;
 use crate::ctx::Context;
 use crate::error::custom_error;
 use crate::utils::c_uint_to_u32;
-
-use crate::bindings::{ibv_gid, ibv_gid_entry, ibv_query_gid_ex};
-use crate::bindings::{IBV_GID_TYPE_IB, IBV_GID_TYPE_ROCE_V1, IBV_GID_TYPE_ROCE_V2};
 
 use std::mem::MaybeUninit;
 use std::os::raw::c_uint;
 use std::{fmt, io, slice};
 
 #[repr(transparent)]
-pub struct GidEntry(ibv_gid_entry);
+pub struct GidEntry(C::ibv_gid_entry);
 
 impl GidEntry {
     #[inline]
@@ -19,9 +17,9 @@ impl GidEntry {
         unsafe {
             let mut gid = MaybeUninit::<Self>::uninit();
             let context = ctx.ffi_ptr();
-            let entry = gid.as_mut_ptr().cast::<ibv_gid_entry>();
+            let entry = gid.as_mut_ptr().cast::<C::ibv_gid_entry>();
             let flags = 0; // ASK: what is this?
-            let ret = ibv_query_gid_ex(context, port_num, gid_index, entry, flags);
+            let ret = C::ibv_query_gid_ex(context, port_num, gid_index, entry, flags);
             if ret != 0 {
                 return Err(custom_error("failed to query gid entry"));
             }
@@ -45,17 +43,17 @@ impl GidEntry {
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum GidType {
-    IB = c_uint_to_u32(IBV_GID_TYPE_IB),
-    RoceV1 = c_uint_to_u32(IBV_GID_TYPE_ROCE_V1),
-    RoceV2 = c_uint_to_u32(IBV_GID_TYPE_ROCE_V2),
+    IB = c_uint_to_u32(C::IBV_GID_TYPE_IB),
+    RoceV1 = c_uint_to_u32(C::IBV_GID_TYPE_ROCE_V1),
+    RoceV2 = c_uint_to_u32(C::IBV_GID_TYPE_ROCE_V2),
 }
 
 impl GidType {
     fn from_c_uint(val: c_uint) -> Self {
         match val {
-            IBV_GID_TYPE_IB => GidType::IB,
-            IBV_GID_TYPE_ROCE_V1 => GidType::RoceV1,
-            IBV_GID_TYPE_ROCE_V2 => GidType::RoceV2,
+            C::IBV_GID_TYPE_IB => GidType::IB,
+            C::IBV_GID_TYPE_ROCE_V1 => GidType::RoceV1,
+            C::IBV_GID_TYPE_ROCE_V2 => GidType::RoceV2,
             _ => panic!("unknown gid type"),
         }
     }
@@ -63,13 +61,13 @@ impl GidType {
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct Gid(ibv_gid);
+pub struct Gid(C::ibv_gid);
 
 impl Gid {
     #[inline]
     #[must_use]
     pub fn from_bytes(bytes: [u8; 16]) -> Self {
-        Self(ibv_gid { raw: bytes })
+        Self(C::ibv_gid { raw: bytes })
     }
 
     #[inline]

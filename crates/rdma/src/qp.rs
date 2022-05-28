@@ -1,22 +1,10 @@
+use crate::bindings as C;
 use crate::cq::{self, CompletionQueue};
 use crate::error::{create_resource, from_errno};
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, c_uint_to_u32, usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
-
-use crate::bindings::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp, ibv_recv_wr};
-use crate::bindings::{ibv_post_recv, ibv_post_send};
-use crate::bindings::{ibv_qp, ibv_qp_cap, ibv_qp_init_attr_ex};
-use crate::bindings::{ibv_send_wr, IBV_QP_INIT_ATTR_PD};
-use crate::bindings::{
-    IBV_QPT_DRIVER,   //
-    IBV_QPT_RC,       //
-    IBV_QPT_UC,       //
-    IBV_QPT_UD,       //
-    IBV_QPT_XRC_RECV, //
-    IBV_QPT_XRC_SEND, //
-};
 
 use std::os::raw::c_uint;
 use std::ptr::{self, NonNull};
@@ -36,7 +24,7 @@ unsafe impl Resource for QueuePair {
 }
 
 impl QueuePair {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_qp {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_qp {
         self.0.ffi_ptr()
     }
 
@@ -58,27 +46,27 @@ impl QueuePair {
         let owner = unsafe {
             let context = (*pd.ffi_ptr()).context;
 
-            let mut qp_attr: ibv_qp_init_attr_ex = mem::zeroed();
+            let mut qp_attr: C::ibv_qp_init_attr_ex = mem::zeroed();
 
             qp_attr.pd = pd.ffi_ptr();
 
             qp_attr.qp_context = usize_to_void_ptr(options.user_data);
 
             if let Some(ref send_cq) = options.send_cq {
-                qp_attr.send_cq = ibv_cq_ex_to_cq(send_cq.ffi_ptr());
+                qp_attr.send_cq = C::ibv_cq_ex_to_cq(send_cq.ffi_ptr());
             }
 
             if let Some(ref recv_cq) = options.recv_cq {
-                qp_attr.recv_cq = ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
+                qp_attr.recv_cq = C::ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
             }
 
             qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
             qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
             qp_attr.cap = options.cap;
-            qp_attr.comp_mask = IBV_QP_INIT_ATTR_PD;
+            qp_attr.comp_mask = C::IBV_QP_INIT_ATTR_PD;
 
             let qp = create_resource(
-                || ibv_create_qp_ex(context, &mut qp_attr),
+                || C::ibv_create_qp_ex(context, &mut qp_attr),
                 || "failed to create queue pair",
             )?;
 
@@ -113,9 +101,9 @@ impl QueuePair {
     #[inline]
     pub unsafe fn post_send(&self, send_wr: &mut SendRequest) -> io::Result<()> {
         let qp = self.ffi_ptr();
-        let wr: *mut ibv_send_wr = <*mut SendRequest>::cast(send_wr);
-        let mut bad_wr: *mut ibv_send_wr = ptr::null_mut();
-        let ret = ibv_post_send(qp, wr, &mut bad_wr);
+        let wr: *mut C::ibv_send_wr = <*mut SendRequest>::cast(send_wr);
+        let mut bad_wr: *mut C::ibv_send_wr = ptr::null_mut();
+        let ret = C::ibv_post_send(qp, wr, &mut bad_wr);
         if ret != 0 {
             return Err(from_errno(ret));
         }
@@ -127,9 +115,9 @@ impl QueuePair {
     #[inline]
     pub unsafe fn post_recv(&self, recv_wr: &mut RecvRequest) -> io::Result<()> {
         let qp = self.ffi_ptr();
-        let wr: *mut ibv_recv_wr = <*mut RecvRequest>::cast(recv_wr);
-        let mut bad_wr: *mut ibv_recv_wr = ptr::null_mut();
-        let ret = ibv_post_recv(qp, wr, &mut bad_wr);
+        let wr: *mut C::ibv_recv_wr = <*mut RecvRequest>::cast(recv_wr);
+        let mut bad_wr: *mut C::ibv_recv_wr = ptr::null_mut();
+        let ret = C::ibv_post_recv(qp, wr, &mut bad_wr);
         if ret != 0 {
             return Err(from_errno(ret));
         }
@@ -138,7 +126,7 @@ impl QueuePair {
 }
 
 pub(crate) struct Owner {
-    qp: NonNull<ibv_qp>,
+    qp: NonNull<C::ibv_qp>,
 
     _pd: Arc<pd::Owner>,
     _send_cq: Option<Arc<cq::Owner>>,
@@ -151,7 +139,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    fn ffi_ptr(&self) -> *mut ibv_qp {
+    fn ffi_ptr(&self) -> *mut C::ibv_qp {
         self.qp.as_ptr()
     }
 }
@@ -160,8 +148,8 @@ impl Drop for Owner {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {
-            let qp: *mut ibv_qp = self.ffi_ptr();
-            let ret = ibv_destroy_qp(qp);
+            let qp: *mut C::ibv_qp = self.ffi_ptr();
+            let ret = C::ibv_destroy_qp(qp);
             assert_eq!(ret, 0);
         }
     }
@@ -173,7 +161,7 @@ pub struct QueuePairOptions {
     recv_cq: Option<Arc<cq::Owner>>,
     qp_type: Option<QueuePairType>,
     sq_sig_all: Option<bool>,
-    cap: ibv_qp_cap,
+    cap: C::ibv_qp_cap,
 }
 
 impl Default for QueuePairOptions {
@@ -258,12 +246,12 @@ impl QueuePairNumber {
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum QueuePairType {
-    RC = c_uint_to_u32(IBV_QPT_RC),
-    UC = c_uint_to_u32(IBV_QPT_UC),
-    UD = c_uint_to_u32(IBV_QPT_UD),
-    Driver = c_uint_to_u32(IBV_QPT_DRIVER),
-    XrcRecv = c_uint_to_u32(IBV_QPT_XRC_RECV),
-    XrcSend = c_uint_to_u32(IBV_QPT_XRC_SEND),
+    RC = c_uint_to_u32(C::IBV_QPT_RC),
+    UC = c_uint_to_u32(C::IBV_QPT_UC),
+    UD = c_uint_to_u32(C::IBV_QPT_UD),
+    Driver = c_uint_to_u32(C::IBV_QPT_DRIVER),
+    XrcRecv = c_uint_to_u32(C::IBV_QPT_XRC_RECV),
+    XrcSend = c_uint_to_u32(C::IBV_QPT_XRC_SEND),
 }
 
 impl QueuePairType {

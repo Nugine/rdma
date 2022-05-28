@@ -1,11 +1,9 @@
+use crate::bindings as C;
 use crate::cq::{self, CompletionQueue};
 use crate::ctx::{self, Context};
 use crate::error::{create_resource, custom_error};
 use crate::resource::Resource;
 use crate::weakset::WeakSet;
-
-use crate::bindings::{ibv_comp_channel, ibv_cq, ibv_get_cq_event};
-use crate::bindings::{ibv_create_comp_channel, ibv_destroy_comp_channel};
 
 use std::os::raw::c_void;
 use std::os::unix::prelude::{AsRawFd, RawFd};
@@ -28,7 +26,7 @@ unsafe impl Resource for CompChannel {
 }
 
 impl CompChannel {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_comp_channel {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_comp_channel {
         self.0.ffi_ptr()
     }
 
@@ -37,7 +35,7 @@ impl CompChannel {
         // SAFETY: ffi
         let owner = unsafe {
             let cc = create_resource(
-                || ibv_create_comp_channel(ctx.ffi_ptr()),
+                || C::ibv_create_comp_channel(ctx.ffi_ptr()),
                 || "failed to create completion channel",
             )?;
 
@@ -53,11 +51,11 @@ impl CompChannel {
     #[inline]
     pub fn wait_cq_event(&self) -> io::Result<CompletionQueue> {
         let cc = self.ffi_ptr();
-        let mut cq: *mut ibv_cq = ptr::null_mut();
+        let mut cq: *mut C::ibv_cq = ptr::null_mut();
         let mut cq_context: *mut c_void = ptr::null_mut();
         // SAFETY: ffi
         unsafe {
-            let ret = ibv_get_cq_event(cc, &mut cq, &mut cq_context);
+            let ret = C::ibv_get_cq_event(cc, &mut cq, &mut cq_context);
             if ret != 0 {
                 return Err(custom_error("failed to get completion event"));
             }
@@ -81,7 +79,7 @@ impl AsRawFd for CompChannel {
 }
 
 pub(crate) struct Owner {
-    cc: NonNull<ibv_comp_channel>,
+    cc: NonNull<C::ibv_comp_channel>,
 
     cq_ref: Mutex<WeakSet<cq::Owner>>,
     _ctx: Arc<ctx::Owner>,
@@ -93,7 +91,7 @@ unsafe impl Send for Owner {}
 unsafe impl Sync for Owner {}
 
 impl Owner {
-    pub(crate) fn ffi_ptr(&self) -> *mut ibv_comp_channel {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_comp_channel {
         self.cc.as_ptr()
     }
 
@@ -111,7 +109,7 @@ impl Drop for Owner {
         // SAFETY: ffi
         unsafe {
             let cc = self.ffi_ptr();
-            let ret = ibv_destroy_comp_channel(cc);
+            let ret = C::ibv_destroy_comp_channel(cc);
             assert_eq!(ret, 0);
         }
     }
