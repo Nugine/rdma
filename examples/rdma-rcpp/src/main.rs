@@ -7,7 +7,7 @@ use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
-use rdma::qp::{QueuePair, QueuePairType};
+use rdma::qp::{self, QueuePair, QueuePairType};
 
 use std::env;
 use std::net::SocketAddr;
@@ -103,6 +103,16 @@ fn run(args: &Args, server: Option<SocketAddr>) -> Result<()> {
             .qp_type(QueuePairType::RC);
         QueuePair::create(&pd, options)?
     };
+
+    let can_send_inline = {
+        let mut options = qp::QueryOptions::default();
+        options.cap();
+        let qp_attr = qp.query(options)?;
+        let max_inline_data = qp_attr.max_inline_data().unwrap().numeric_cast::<usize>();
+        max_inline_data >= args.rx_depth
+    };
+
+    
 
     Ok(())
 }
