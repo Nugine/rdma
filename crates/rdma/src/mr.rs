@@ -3,8 +3,8 @@ use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::utils::c_uint_to_u32;
 
-use rdma_sys::{ibv_dereg_mr, ibv_mr, ibv_reg_mr};
-use rdma_sys::{
+use crate::bindings::{ibv_dereg_mr, ibv_mr, ibv_reg_mr};
+use crate::bindings::{
     IBV_ACCESS_HUGETLB,          //
     IBV_ACCESS_LOCAL_WRITE,      //
     IBV_ACCESS_MW_BIND,          //

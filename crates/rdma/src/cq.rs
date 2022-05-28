@@ -5,11 +5,11 @@ use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, ptr_as_mut};
 use crate::wc::WorkCompletion;
 
-use rdma_sys::ibv_cq_ex_to_cq;
-use rdma_sys::{ibv_ack_cq_events, ibv_req_notify_cq};
-use rdma_sys::{ibv_cq_ex, ibv_cq_init_attr_ex};
-use rdma_sys::{ibv_create_cq_ex, ibv_destroy_cq};
-use rdma_sys::{ibv_poll_cq, ibv_wc};
+use crate::bindings::ibv_cq_ex_to_cq;
+use crate::bindings::{ibv_ack_cq_events, ibv_req_notify_cq};
+use crate::bindings::{ibv_cq_ex, ibv_cq_init_attr_ex};
+use crate::bindings::{ibv_create_cq_ex, ibv_destroy_cq};
+use crate::bindings::{ibv_poll_cq, ibv_wc};
 
 use std::mem::{self, ManuallyDrop, MaybeUninit};
 use std::os::raw::{c_int, c_uint, c_void};

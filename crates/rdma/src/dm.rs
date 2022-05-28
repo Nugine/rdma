@@ -2,7 +2,7 @@ use crate::ctx::{self, Context};
 use crate::error::create_resource;
 use crate::resource::Resource;
 
-use rdma_sys::{ibv_alloc_dm, ibv_alloc_dm_attr, ibv_dm, ibv_free_dm};
+use crate::bindings::{ibv_alloc_dm, ibv_alloc_dm_attr, ibv_dm, ibv_free_dm};
 
 use std::ptr::NonNull;
 use std::sync::Arc;

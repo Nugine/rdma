@@ -4,8 +4,8 @@ use crate::error::{create_resource, custom_error};
 use crate::resource::Resource;
 use crate::weakset::WeakSet;
 
-use rdma_sys::{ibv_comp_channel, ibv_cq, ibv_get_cq_event};
-use rdma_sys::{ibv_create_comp_channel, ibv_destroy_comp_channel};
+use crate::bindings::{ibv_comp_channel, ibv_cq, ibv_get_cq_event};
+use crate::bindings::{ibv_create_comp_channel, ibv_destroy_comp_channel};
 
 use std::os::raw::c_void;
 use std::os::unix::prelude::{AsRawFd, RawFd};

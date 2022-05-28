@@ -1,4 +1,4 @@
-use rdma_sys::{ibv_recv_wr, ibv_send_wr, ibv_sge};
+use crate::bindings::{ibv_recv_wr, ibv_send_wr, ibv_sge};
 
 use std::mem;
 use std::os::raw::c_int;

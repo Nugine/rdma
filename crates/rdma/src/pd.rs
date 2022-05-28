@@ -3,8 +3,8 @@ use crate::error::create_resource;
 use crate::qp::{QueuePair, QueuePairOptions};
 use crate::resource::Resource;
 
-use rdma_sys::ibv_pd;
-use rdma_sys::{ibv_alloc_pd, ibv_dealloc_pd};
+use crate::bindings::ibv_pd;
+use crate::bindings::{ibv_alloc_pd, ibv_dealloc_pd};
 
 use std::io;
 use std::ptr::NonNull;

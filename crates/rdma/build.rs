@@ -19,8 +19,6 @@ fn link_rdma_core(lib_name: &str, pkg_name: &str, version: &str, include_paths: 
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=src");
-
     let mut include_paths: Vec<String> = Vec::new();
 
     {
@@ -51,7 +49,7 @@ fn main() {
 
         let bindings = bindgen::Builder::default()
             .clang_args(include_args)
-            .header("src/bindings.h")
+            .header("src/bindings/generated.h")
             .allowlist_function("ibv.+")
             .allowlist_type("ibv.+")
             .allowlist_var("IBV.+")
@@ -70,7 +68,8 @@ fn main() {
             .default_enum_style("consts".parse().unwrap())
             .size_t_is_usize(true)
             .rustfmt_bindings(true)
-            .rust_target("1.47".parse().unwrap());
+            .rust_target("1.47".parse().unwrap())
+            .layout_tests(false); // FIXME: turn on layout tests when bindgen releases the next version
 
         {
             let mut cmd_flags = bindings.command_line_flags();
@@ -85,7 +84,7 @@ fn main() {
         bindings
             .generate()
             .expect("Unable to generate bindings")
-            .write_to_file(out_dir.join("bindings.rs"))
+            .write_to_file(out_dir.join("generated.rs"))
             .expect("Couldn't write bindings!");
     }
 }

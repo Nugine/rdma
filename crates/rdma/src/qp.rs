@@ -5,10 +5,11 @@ use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, c_uint_to_u32, usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
 
-use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp, ibv_post_recv, ibv_recv_wr};
-use rdma_sys::{ibv_post_send, ibv_send_wr, IBV_QP_INIT_ATTR_PD};
-use rdma_sys::{ibv_qp, ibv_qp_cap, ibv_qp_init_attr_ex};
-use rdma_sys::{
+use crate::bindings::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp, ibv_recv_wr};
+use crate::bindings::{ibv_post_recv, ibv_post_send};
+use crate::bindings::{ibv_qp, ibv_qp_cap, ibv_qp_init_attr_ex};
+use crate::bindings::{ibv_send_wr, IBV_QP_INIT_ATTR_PD};
+use crate::bindings::{
     IBV_QPT_DRIVER,   //
     IBV_QPT_RC,       //
     IBV_QPT_UC,       //

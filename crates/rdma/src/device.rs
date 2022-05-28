@@ -1,10 +1,10 @@
 use crate::ctx::Context;
 use crate::error::last_error;
 
-use rdma_sys::__be64;
-use rdma_sys::ibv_device;
-use rdma_sys::{ibv_free_device_list, ibv_get_device_list};
-use rdma_sys::{ibv_get_device_guid, ibv_get_device_name};
+use crate::bindings::__be64;
+use crate::bindings::ibv_device;
+use crate::bindings::{ibv_free_device_list, ibv_get_device_list};
+use crate::bindings::{ibv_get_device_guid, ibv_get_device_name};
 
 use std::ffi::CStr;
 use std::io;

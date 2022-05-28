@@ -2,8 +2,8 @@ use crate::ctx::Context;
 use crate::error::from_errno;
 use crate::utils::{box_assume_init, box_new_uninit};
 
-use rdma_sys::ibv_device_attr_ex;
-use rdma_sys::ibv_query_device_ex;
+use crate::bindings::ibv_device_attr_ex;
+use crate::bindings::ibv_query_device_ex;
 
 use std::io;
 use std::ptr;

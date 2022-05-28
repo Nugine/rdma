@@ -1,14 +1,23 @@
 //! libibverbs 1.14.41
 //! static inline functions
+#![allow(
+    clippy::as_conversions,
+    clippy::unneeded_field_pattern,
+    clippy::undocumented_unsafe_blocks,
+    clippy::integer_arithmetic,
+    clippy::inline_always,
+    clippy::shadow_same,
+    clippy::missing_safety_doc
+)]
 
-use crate::*;
+use super::*;
 
 use std::mem;
 use std::ops::Not;
 use std::ptr;
 
 /// Calculates the offset of the specified field from the start of the named struct.
-/// This macro is impossible to be const until feature(const_ptr_offset_from) is stable.
+/// This macro is impossible to be const until `feature(const_ptr_offset_from)` is stable.
 macro_rules! offset_of {
     ($ty: path, $field: tt) => {{
         // ensure the type is a named struct
@@ -41,7 +50,7 @@ macro_rules! container_of {
 
 #[inline(always)]
 unsafe fn set_errno(errno: i32) {
-    __errno_location().write(errno)
+    __errno_location().write(errno);
 }
 
 mod compat {
@@ -316,13 +325,13 @@ pub unsafe fn ibv_wr_atomic_cmp_swp(
     swap: u64,
 ) {
     let op: _ = (*qp).wr_atomic_cmp_swp.unwrap_unchecked();
-    (op)(qp, rkey, remote_addr, compare, swap)
+    (op)(qp, rkey, remote_addr, compare, swap);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_atomic_fetch_add(qp: *mut ibv_qp_ex, rkey: u32, remote_addr: u64, add: u64) {
     let op: _ = (*qp).wr_atomic_fetch_add.unwrap_unchecked();
-    (op)(qp, rkey, remote_addr, add)
+    (op)(qp, rkey, remote_addr, add);
 }
 
 #[inline]
@@ -333,25 +342,25 @@ pub unsafe fn ibv_wr_bind_mw(
     bind_info: *const ibv_mw_bind_info,
 ) {
     let op: _ = (*qp).wr_bind_mw.unwrap_unchecked();
-    (op)(qp, mw, rkey, bind_info)
+    (op)(qp, mw, rkey, bind_info);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_local_inv(qp: *mut ibv_qp_ex, invalidate_rkey: u32) {
     let op: _ = (*qp).wr_local_inv.unwrap_unchecked();
-    (op)(qp, invalidate_rkey)
+    (op)(qp, invalidate_rkey);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_rdma_read(qp: *mut ibv_qp_ex, rkey: u32, remote_addr: u64) {
     let op: _ = (*qp).wr_rdma_read.unwrap_unchecked();
-    (op)(qp, rkey, remote_addr)
+    (op)(qp, rkey, remote_addr);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_rdma_write(qp: *mut ibv_qp_ex, rkey: u32, remote_addr: u64) {
     let op: _ = (*qp).wr_rdma_write.unwrap_unchecked();
-    (op)(qp, rkey, remote_addr)
+    (op)(qp, rkey, remote_addr);
 }
 
 #[inline]
@@ -362,31 +371,31 @@ pub unsafe fn ibv_wr_rdma_write_imm(
     imm_data: __be32,
 ) {
     let op: _ = (*qp).wr_rdma_write_imm.unwrap_unchecked();
-    (op)(qp, rkey, remote_addr, imm_data)
+    (op)(qp, rkey, remote_addr, imm_data);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send(qp: *mut ibv_qp_ex) {
     let op: _ = (*qp).wr_send.unwrap_unchecked();
-    (op)(qp)
+    (op)(qp);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send_imm(qp: *mut ibv_qp_ex, imm_data: __be32) {
     let op: _ = (*qp).wr_send_imm.unwrap_unchecked();
-    (op)(qp, imm_data)
+    (op)(qp, imm_data);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send_inv(qp: *mut ibv_qp_ex, invalidate_rkey: u32) {
     let op: _ = (*qp).wr_send_inv.unwrap_unchecked();
-    (op)(qp, invalidate_rkey)
+    (op)(qp, invalidate_rkey);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send_tso(qp: *mut ibv_qp_ex, hdr: *mut c_void, hdr_sz: u16, mss: u16) {
     let op: _ = (*qp).wr_send_tso.unwrap_unchecked();
-    (op)(qp, hdr, hdr_sz, mss)
+    (op)(qp, hdr, hdr_sz, mss);
 }
 
 #[inline]
@@ -397,19 +406,19 @@ pub unsafe fn ibv_wr_set_ud_addr(
     remote_qkey: u32,
 ) {
     let op: _ = (*qp).wr_set_ud_addr.unwrap_unchecked();
-    (op)(qp, ah, remote_qpn, remote_qkey)
+    (op)(qp, ah, remote_qpn, remote_qkey);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_xrc_srqn(qp: *mut ibv_qp_ex, remote_srqn: u32) {
     let op: _ = (*qp).wr_set_xrc_srqn.unwrap_unchecked();
-    (op)(qp, remote_srqn)
+    (op)(qp, remote_srqn);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_inline_data(qp: *mut ibv_qp_ex, addr: *mut c_void, length: usize) {
     let op: _ = (*qp).wr_set_inline_data.unwrap_unchecked();
-    (op)(qp, addr, length)
+    (op)(qp, addr, length);
 }
 
 #[inline]
@@ -419,25 +428,25 @@ pub unsafe fn ibv_wr_set_inline_data_list(
     buf_list: *const ibv_data_buf,
 ) {
     let op: _ = (*qp).wr_set_inline_data_list.unwrap_unchecked();
-    (op)(qp, num_buf, buf_list)
+    (op)(qp, num_buf, buf_list);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_sge(qp: *mut ibv_qp_ex, lkey: u32, addr: u64, length: u32) {
     let op: _ = (*qp).wr_set_sge.unwrap_unchecked();
-    (op)(qp, lkey, addr, length)
+    (op)(qp, lkey, addr, length);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_sge_list(qp: *mut ibv_qp_ex, num_sge: usize, sg_list: *const ibv_sge) {
     let op: _ = (*qp).wr_set_sge_list.unwrap_unchecked();
-    (op)(qp, num_sge, sg_list)
+    (op)(qp, num_sge, sg_list);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_start(qp: *mut ibv_qp_ex) {
     let op: _ = (*qp).wr_start.unwrap_unchecked();
-    (op)(qp)
+    (op)(qp);
 }
 
 #[inline]
@@ -449,5 +458,5 @@ pub unsafe fn ibv_wr_complete(qp: *mut ibv_qp_ex) -> c_int {
 #[inline]
 pub unsafe fn ibv_wr_abort(qp: *mut ibv_qp_ex) {
     let op: _ = (*qp).wr_abort.unwrap_unchecked();
-    (op)(qp)
+    (op)(qp);
 }

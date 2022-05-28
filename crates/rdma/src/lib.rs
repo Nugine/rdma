@@ -16,12 +16,23 @@
     clippy::panic,
     clippy::enum_glob_use,
     clippy::exhaustive_enums,
-    clippy::exhaustive_structs
+    clippy::exhaustive_structs,
+    clippy::unseparated_literal_suffix
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
     clippy::missing_docs_in_private_items, // TODO
 )]
+
+pub mod bindings {
+    use libc::*;
+
+    mod generated;
+    pub use self::generated::*;
+
+    mod ibverbs;
+    pub use self::ibverbs::*;
+}
 
 mod error;
 #[macro_use]

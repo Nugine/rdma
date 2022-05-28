@@ -8,8 +8,8 @@ use crate::query::GidEntry;
 use crate::query::PortAttr;
 use crate::resource::Resource;
 
-use rdma_sys::ibv_context;
-use rdma_sys::{ibv_close_device, ibv_open_device};
+use crate::bindings::ibv_context;
+use crate::bindings::{ibv_close_device, ibv_open_device};
 
 use std::io;
 use std::ptr::NonNull;

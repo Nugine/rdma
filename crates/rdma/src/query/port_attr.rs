@@ -5,9 +5,13 @@ use crate::utils::{box_assume_init, box_new_uninit, c_uint_to_u32};
 use std::io;
 use std::os::raw::c_uint;
 
-use rdma_sys::{ibv_port_attr, ibv_query_port};
-use rdma_sys::{IBV_LINK_LAYER_ETHERNET, IBV_LINK_LAYER_INFINIBAND, IBV_LINK_LAYER_UNSPECIFIED};
-use rdma_sys::{
+use crate::bindings::{ibv_port_attr, ibv_query_port};
+use crate::bindings::{
+    IBV_LINK_LAYER_ETHERNET,    //
+    IBV_LINK_LAYER_INFINIBAND,  //
+    IBV_LINK_LAYER_UNSPECIFIED, //
+};
+use crate::bindings::{
     IBV_PORT_ACTIVE,       //
     IBV_PORT_ACTIVE_DEFER, //
     IBV_PORT_ARMED,        //

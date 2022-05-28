@@ -3,8 +3,8 @@ use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::utils::c_uint_to_u32;
 
-use rdma_sys::{ibv_alloc_mw, ibv_dealloc_mw, ibv_mw};
-use rdma_sys::{IBV_MW_TYPE_1, IBV_MW_TYPE_2};
+use crate::bindings::{ibv_alloc_mw, ibv_dealloc_mw, ibv_mw};
+use crate::bindings::{IBV_MW_TYPE_1, IBV_MW_TYPE_2};
 
 use std::io;
 use std::os::raw::c_uint;
