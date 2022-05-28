@@ -15,10 +15,11 @@ sync-version:
     #!/bin/bash -e
     cd {{justfile_directory()}}
     vers='0.1.0-dev'
-    for pkg in `ls crates`
+    echo $vers
+    for pkg in `fd --glob '*' -t d -d 1 ./crates ./examples`
     do
-        echo $pkg $vers
-        pushd crates/$pkg > /dev/null
+        echo $pkg
+        pushd $pkg > /dev/null
         cargo set-version $vers
         popd > /dev/null
     done
