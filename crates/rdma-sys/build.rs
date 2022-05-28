@@ -3,6 +3,21 @@
 use std::env;
 use std::path::PathBuf;
 
+fn link_rdma_core(lib_name: &str, pkg_name: &str, version: &str, include_paths: &mut Vec<String>) {
+    let result: _ = pkg_config::Config::new()
+        .atleast_version(version)
+        .statik(false)
+        .probe(lib_name);
+
+    let lib = result.unwrap_or_else(|_| panic!("please install {pkg_name} {version})"));
+    println!("found {pkg_name} {}", lib.version);
+
+    for path in lib.include_paths {
+        let path = path.to_str().expect("non-utf8 path");
+        include_paths.push(path.to_owned());
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src");
 
@@ -12,39 +27,16 @@ fn main() {
         let lib_name = "libibverbs";
         let pkg_name = "libibverbs-dev";
         let version = "1.14.41";
-
-        let result: _ = pkg_config::Config::new()
-            .atleast_version(version)
-            .statik(false)
-            .probe(lib_name);
-
-        let lib = result.unwrap_or_else(|_| panic!("please install {pkg_name} {version})"));
-        println!("found {pkg_name} {}", lib.version);
-
-        for p in lib.include_paths {
-            let p = p.to_str().expect("utf8 path").to_owned();
-            include_paths.push(p)
-        }
+        link_rdma_core(lib_name, pkg_name, version, &mut include_paths);
     }
 
     {
         let lib_name = "librdmacm";
         let pkg_name = "librdmacm-dev";
         let version = "1.3.41";
-
-        let result: _ = pkg_config::Config::new()
-            .atleast_version(version)
-            .statik(false)
-            .probe(lib_name);
-
-        let lib = result.unwrap_or_else(|_| panic!("please install {pkg_name} {version})"));
-        println!("found {pkg_name} {}", lib.version);
-
-        for p in lib.include_paths {
-            let p = p.to_str().expect("utf8 path").to_owned();
-            include_paths.push(p)
-        }
+        link_rdma_core(lib_name, pkg_name, version, &mut include_paths);
     }
+
     {
         include_paths.sort_unstable();
         include_paths.dedup_by(|x, first| x == first);
