@@ -3,7 +3,9 @@ use crate::cq::{self, CompletionQueue};
 use crate::error::{create_resource, from_errno};
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
-use crate::utils::{bool_to_c_int, c_uint_to_u32, usize_to_void_ptr, void_ptr_to_usize};
+use crate::utils::{
+    bool_to_c_int, c_uint_to_u32, u32_as_c_uint, usize_to_void_ptr, void_ptr_to_usize,
+};
 use crate::wr::{RecvRequest, SendRequest};
 
 use std::os::raw::{c_int, c_uint};
@@ -270,9 +272,9 @@ pub enum QueuePairType {
 }
 
 impl QueuePairType {
-    #[allow(clippy::as_conversions)]
     fn to_c_uint(self) -> c_uint {
-        self as u32 as c_uint
+        #[allow(clippy::as_conversions)]
+        u32_as_c_uint(self as u32)
     }
 }
 

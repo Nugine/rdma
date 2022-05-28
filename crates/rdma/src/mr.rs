@@ -2,7 +2,7 @@ use crate::bindings as C;
 use crate::error::create_resource;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
-use crate::utils::c_uint_to_u32;
+use crate::utils::{c_uint_to_u32, u32_as_c_uint};
 
 use std::io;
 use std::os::raw::{c_uint, c_void};
@@ -131,8 +131,7 @@ bitflags! {
 }
 
 impl AccessFlags {
-    #[allow(clippy::as_conversions)]
     fn to_c_uint(self) -> c_uint {
-        self.bits() as c_uint
+        u32_as_c_uint(self.bits())
     }
 }
