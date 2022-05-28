@@ -6,7 +6,7 @@ use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, c_uint_to_u32, usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
 
-use std::os::raw::c_uint;
+use std::os::raw::{c_int, c_uint};
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
 use std::{io, mem};
@@ -122,6 +122,21 @@ impl QueuePair {
             return Err(from_errno(ret));
         }
         Ok(())
+    }
+
+    #[inline]
+    pub fn modify(&self, options: ModifyOptions) -> io::Result<()> {
+        let qp = self.ffi_ptr();
+        // SAFETY: ffi
+        unsafe {
+            let attr_mask: c_int = mem::transmute(options.mask);
+            let mut attr = options.attr;
+            let ret = C::ibv_modify_qp(qp, &mut attr, attr_mask);
+            if ret != 0 {
+                return Err(from_errno(ret));
+            }
+            Ok(())
+        }
     }
 }
 
@@ -258,5 +273,19 @@ impl QueuePairType {
     #[allow(clippy::as_conversions)]
     fn to_c_uint(self) -> c_uint {
         self as u32 as c_uint
+    }
+}
+
+#[repr(C)]
+pub struct ModifyOptions {
+    mask: C::ibv_qp_attr_mask,
+    attr: C::ibv_qp_attr,
+}
+
+impl Default for ModifyOptions {
+    #[inline]
+    fn default() -> Self {
+        // SAFETY: POD ffi type
+        unsafe { mem::zeroed() }
     }
 }

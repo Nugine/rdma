@@ -25,7 +25,6 @@ impl DeviceMemory {
         DeviceMemoryOptions::default()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     #[inline]
     pub fn alloc(ctx: &Context, options: DeviceMemoryOptions) -> io::Result<Self> {
         // SAFETY: ffi

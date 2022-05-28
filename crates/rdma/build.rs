@@ -64,6 +64,7 @@ fn main() {
             .blocklist_type("socklen_t")
             .blocklist_function("ibv_reg_mr")
             .blocklist_function("ibv_query_port")
+            .no_copy("ibv_.+_attr")
             .prepend_enum_name(false)
             .default_enum_style("consts".parse().unwrap())
             .size_t_is_usize(true)
