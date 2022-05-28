@@ -1,11 +1,12 @@
 use crate::cq::{self, CompletionQueue};
-use crate::error::create_resource;
+use crate::error::{create_resource, from_errno};
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, c_uint_to_u32, usize_to_void_ptr, void_ptr_to_usize};
+use crate::wr::{RecvRequest, SendRequest};
 
-use rdma_sys::IBV_QP_INIT_ATTR_PD;
-use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp};
+use rdma_sys::{ibv_cq_ex_to_cq, ibv_create_qp_ex, ibv_destroy_qp, ibv_post_recv, ibv_recv_wr};
+use rdma_sys::{ibv_post_send, ibv_send_wr, IBV_QP_INIT_ATTR_PD};
 use rdma_sys::{ibv_qp, ibv_qp_cap, ibv_qp_init_attr_ex};
 use rdma_sys::{
     IBV_QPT_DRIVER,   //
@@ -17,7 +18,7 @@ use rdma_sys::{
 };
 
 use std::os::raw::c_uint;
-use std::ptr::NonNull;
+use std::ptr::{self, NonNull};
 use std::sync::Arc;
 use std::{io, mem};
 
@@ -104,6 +105,34 @@ impl QueuePair {
         let qp = self.ffi_ptr();
         // SAFETY: reading a immutable field of a concurrent ffi type
         unsafe { void_ptr_to_usize((*qp).qp_context) }
+    }
+
+    /// # Safety
+    /// TODO
+    #[inline]
+    pub unsafe fn post_send(&self, send_wr: &mut SendRequest) -> io::Result<()> {
+        let qp = self.ffi_ptr();
+        let wr: *mut ibv_send_wr = <*mut SendRequest>::cast(send_wr);
+        let mut bad_wr: *mut ibv_send_wr = ptr::null_mut();
+        let ret = ibv_post_send(qp, wr, &mut bad_wr);
+        if ret != 0 {
+            return Err(from_errno(ret));
+        }
+        Ok(())
+    }
+
+    /// # Safety
+    /// TODO
+    #[inline]
+    pub unsafe fn post_recv(&self, recv_wr: &mut RecvRequest) -> io::Result<()> {
+        let qp = self.ffi_ptr();
+        let wr: *mut ibv_recv_wr = <*mut RecvRequest>::cast(recv_wr);
+        let mut bad_wr: *mut ibv_recv_wr = ptr::null_mut();
+        let ret = ibv_post_recv(qp, wr, &mut bad_wr);
+        if ret != 0 {
+            return Err(from_errno(ret));
+        }
+        Ok(())
     }
 }
 
