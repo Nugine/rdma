@@ -198,14 +198,18 @@ fn be64_to_hex<R>(src: __be64, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -
 impl fmt::LowerHex for Guid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        be64_to_hex(self.0, hex_simd::AsciiCase::Lower, |s| f.write_str(s))
+        be64_to_hex(self.0, hex_simd::AsciiCase::Lower, |s| {
+            <str as fmt::Display>::fmt(s, f)
+        })
     }
 }
 
 impl fmt::UpperHex for Guid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        be64_to_hex(self.0, hex_simd::AsciiCase::Upper, |s| f.write_str(s))
+        be64_to_hex(self.0, hex_simd::AsciiCase::Upper, |s| {
+            <str as fmt::Display>::fmt(s, f)
+        })
     }
 }
 
