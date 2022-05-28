@@ -184,9 +184,9 @@ impl fmt::Debug for Guid {
     }
 }
 
-fn be64_to_hex<R>(src: __be64, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -> R) -> R {
+fn guid_to_hex<R>(guid: Guid, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -> R) -> R {
     // SAFETY: same repr
-    let src: &[u8; 8] = unsafe { mem::transmute(&src) };
+    let src: &[u8; 8] = guid.as_bytes();
     let mut buf: MaybeUninit<[u8; 16]> = MaybeUninit::uninit();
     let ans = {
         // SAFETY: uninit project
@@ -202,7 +202,7 @@ fn be64_to_hex<R>(src: __be64, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -
 impl fmt::LowerHex for Guid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        be64_to_hex(self.0, hex_simd::AsciiCase::Lower, |s| {
+        guid_to_hex(*self, hex_simd::AsciiCase::Lower, |s| {
             <str as fmt::Display>::fmt(s, f)
         })
     }
@@ -211,7 +211,7 @@ impl fmt::LowerHex for Guid {
 impl fmt::UpperHex for Guid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        be64_to_hex(self.0, hex_simd::AsciiCase::Upper, |s| {
+        guid_to_hex(*self, hex_simd::AsciiCase::Upper, |s| {
             <str as fmt::Display>::fmt(s, f)
         })
     }
