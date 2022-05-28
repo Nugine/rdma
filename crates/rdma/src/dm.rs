@@ -26,12 +26,12 @@ impl DeviceMemory {
     }
 
     #[inline]
-    pub fn alloc(ctx: &Context, options: DeviceMemoryOptions) -> io::Result<Self> {
+    pub fn alloc(ctx: &Context, mut options: DeviceMemoryOptions) -> io::Result<Self> {
         // SAFETY: ffi
         let owner = unsafe {
-            let mut attr = options.attr;
+            let attr = &mut options.attr;
             let dm = create_resource(
-                || C::ibv_alloc_dm(ctx.ffi_ptr(), &mut attr),
+                || C::ibv_alloc_dm(ctx.ffi_ptr(), attr),
                 || "failed to allocate device memory",
             )?;
             Arc::new(Owner {

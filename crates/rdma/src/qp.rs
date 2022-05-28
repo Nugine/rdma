@@ -127,13 +127,13 @@ impl QueuePair {
     }
 
     #[inline]
-    pub fn modify(&self, options: ModifyOptions) -> io::Result<()> {
+    pub fn modify(&self, mut options: ModifyOptions) -> io::Result<()> {
         let qp = self.ffi_ptr();
         // SAFETY: ffi
         unsafe {
             let attr_mask: c_int = mem::transmute(options.mask);
-            let mut attr = options.attr;
-            let ret = C::ibv_modify_qp(qp, &mut attr, attr_mask);
+            let attr = &mut options.attr;
+            let ret = C::ibv_modify_qp(qp, attr, attr_mask);
             if ret != 0 {
                 return Err(from_errno(ret));
             }
