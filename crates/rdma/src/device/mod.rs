@@ -9,3 +9,6 @@ pub use self::gid::*;
 
 mod port_attr;
 pub use self::port_attr::*;
+
+mod guid;
+pub use self::guid::*;
