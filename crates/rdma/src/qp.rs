@@ -38,38 +38,23 @@ impl QueuePair {
     }
 
     /// # Panics
-    /// 1. if the option `pd` is not set
-    /// 2. if the option `qp_type` is not set
-    /// 3. if the option `sq_sig_all` is not set
+    /// 1. if the option `qp_type` is not set
+    /// 2. if the option `sq_sig_all` is not set
     #[inline]
-    pub fn create(pd: &ProtectionDomain, options: QueuePairOptions) -> io::Result<Self> {
-        assert!(options.qp_type.is_some(), "qp_type is required");
-        assert!(options.sq_sig_all.is_some(), "sq_sig_all is required");
+    pub fn create(pd: &ProtectionDomain, mut options: QueuePairOptions) -> io::Result<Self> {
+        assert!(options.has_qp_type, "qp_type is required");
+        assert!(options.has_sq_sig_all, "sq_sig_all is required");
         // SAFETY: ffi
         let owner = unsafe {
             let context = (*pd.ffi_ptr()).context;
 
-            let mut qp_attr: C::ibv_qp_init_attr_ex = mem::zeroed();
+            let qp_attr = &mut options.attr;
 
             qp_attr.pd = pd.ffi_ptr();
-
-            qp_attr.qp_context = usize_to_void_ptr(options.user_data);
-
-            if let Some(ref send_cq) = options.send_cq {
-                qp_attr.send_cq = C::ibv_cq_ex_to_cq(send_cq.ffi_ptr());
-            }
-
-            if let Some(ref recv_cq) = options.recv_cq {
-                qp_attr.recv_cq = C::ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
-            }
-
-            qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
-            qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
-            qp_attr.cap = mem::transmute(options.cap);
             qp_attr.comp_mask = C::IBV_QP_INIT_ATTR_PD;
 
             let qp = create_resource(
-                || C::ibv_create_qp_ex(context, &mut qp_attr),
+                || C::ibv_create_qp_ex(context, qp_attr),
                 || "failed to create queue pair",
             )?;
 
@@ -190,6 +175,7 @@ impl Drop for Owner {
     }
 }
 
+#[derive(Clone)]
 #[repr(C)]
 pub struct QueuePairCapacity {
     pub max_send_wr: u32,
@@ -227,45 +213,79 @@ impl Default for QueuePairCapacity {
     }
 }
 
-#[derive(Default)]
+impl QueuePairCapacity {
+    fn into_ctype(self) -> C::ibv_qp_cap {
+        // SAFETY: same repr
+        unsafe { mem::transmute(self) }
+    }
+    fn from_ctype_ref(cap: &C::ibv_qp_cap) -> &Self {
+        // SAFETY: same repr
+        unsafe { mem::transmute(cap) }
+    }
+}
+
 pub struct QueuePairOptions {
-    user_data: usize,
+    attr: C::ibv_qp_init_attr_ex,
+
+    has_qp_type: bool,
+    has_sq_sig_all: bool,
+
     send_cq: Option<Arc<cq::Owner>>,
     recv_cq: Option<Arc<cq::Owner>>,
-    qp_type: Option<QueuePairType>,
-    sq_sig_all: Option<bool>,
-    cap: QueuePairCapacity,
+}
+
+// SAFETY: owned type
+unsafe impl Send for QueuePairOptions {}
+// SAFETY: owned type
+unsafe impl Sync for QueuePairOptions {}
+
+impl Default for QueuePairOptions {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            // SAFETY: POD ffi type
+            attr: unsafe { mem::zeroed() },
+            has_qp_type: false,
+            has_sq_sig_all: false,
+            send_cq: None,
+            recv_cq: None,
+        }
+    }
 }
 
 impl QueuePairOptions {
     #[inline]
     pub fn user_data(&mut self, user_data: usize) -> &mut Self {
-        self.user_data = user_data;
+        self.attr.qp_context = usize_to_void_ptr(user_data);
         self
     }
     #[inline]
     pub fn send_cq(&mut self, send_cq: &CompletionQueue) -> &mut Self {
+        self.attr.send_cq = C::ibv_cq_ex_to_cq(send_cq.ffi_ptr());
         self.send_cq = Some(send_cq.strong_ref());
         self
     }
     #[inline]
     pub fn recv_cq(&mut self, recv_cq: &CompletionQueue) -> &mut Self {
+        self.attr.recv_cq = C::ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
         self.recv_cq = Some(recv_cq.strong_ref());
         self
     }
     #[inline]
     pub fn qp_type(&mut self, qp_type: QueuePairType) -> &mut Self {
-        self.qp_type = Some(qp_type);
+        self.attr.qp_type = qp_type.to_c_uint();
+        self.has_qp_type = true;
         self
     }
     #[inline]
     pub fn sq_sig_all(&mut self, sq_sig_all: bool) -> &mut Self {
-        self.sq_sig_all = Some(sq_sig_all);
+        self.attr.sq_sig_all = bool_to_c_int(sq_sig_all);
+        self.has_sq_sig_all = true;
         self
     }
     #[inline]
     pub fn cap(&mut self, cap: QueuePairCapacity) -> &mut Self {
-        self.cap = cap;
+        self.attr.cap = cap.into_ctype();
         self
     }
 }
@@ -304,6 +324,11 @@ pub struct ModifyOptions {
     mask: C::ibv_qp_attr_mask,
     attr: MaybeUninit<C::ibv_qp_attr>,
 }
+
+// SAFETY: owned type
+unsafe impl Send for ModifyOptions {}
+// SAFETY: owned type
+unsafe impl Sync for ModifyOptions {}
 
 impl Default for ModifyOptions {
     #[inline]
@@ -396,14 +421,16 @@ pub struct QueuePairAttr {
     attr: C::ibv_qp_attr,
 }
 
+// SAFETY: owned type
+unsafe impl Send for QueuePairAttr {}
+// SAFETY: owned type
+unsafe impl Sync for QueuePairAttr {}
+
 impl QueuePairAttr {
     #[inline]
     #[must_use]
     pub fn cap(&self) -> Option<&QueuePairCapacity> {
-        (self.mask & C::IBV_QP_CAP != 0).then(|| {
-            // SAFETY: same repr
-            unsafe { mem::transmute(&self.attr.cap) }
-        })
+        (self.mask & C::IBV_QP_CAP != 0).then(|| QueuePairCapacity::from_ctype_ref(&self.attr.cap))
     }
 
     #[inline]

@@ -74,7 +74,7 @@ mod compat {
 }
 
 #[inline]
-pub unsafe fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
+pub fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
     cq.cast()
 }
 
