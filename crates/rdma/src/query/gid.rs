@@ -4,6 +4,7 @@ use crate::error::custom_error;
 use crate::utils::c_uint_to_u32;
 
 use std::mem::MaybeUninit;
+use std::net::Ipv6Addr;
 use std::os::raw::c_uint;
 use std::{fmt, io, slice};
 
@@ -75,6 +76,12 @@ impl Gid {
     pub fn as_bytes(&self) -> &[u8; 16] {
         // SAFETY: type raw bytes
         unsafe { &self.0.raw }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn to_ipv6_addr(&self) -> Ipv6Addr {
+        Ipv6Addr::from(*self.as_bytes())
     }
 }
 
