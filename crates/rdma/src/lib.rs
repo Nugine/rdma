@@ -42,6 +42,7 @@ mod weakset;
 
 pub mod device;
 
+pub mod ah;
 pub mod cc;
 pub mod cq;
 pub mod ctx;
