@@ -385,6 +385,50 @@ impl ModifyOptions {
         self.mask |= C::IBV_QP_PATH_MTU;
         self
     }
+
+    #[inline]
+    pub fn dest_qp_num(&mut self, dest_qp_num: u32) -> &mut Self {
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).dest_qp_num);
+            p.write(dest_qp_num);
+        }
+        self.mask |= C::IBV_QP_DEST_QPN;
+        self
+    }
+
+    #[inline]
+    pub fn rq_psn(&mut self, rq_psn: u32) -> &mut Self {
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).rq_psn);
+            p.write(rq_psn);
+        }
+        self.mask |= C::IBV_QP_RQ_PSN;
+        self
+    }
+
+    #[inline]
+    pub fn max_dest_rd_atomic(&mut self, max_dest_rd_atomic: u8) -> &mut Self {
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).max_dest_rd_atomic);
+            p.write(max_dest_rd_atomic);
+        }
+        self.mask |= C::IBV_QP_MAX_DEST_RD_ATOMIC;
+        self
+    }
+
+    #[inline]
+    pub fn min_rnr_timer(&mut self, min_rnr_timer: u8) -> &mut Self {
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).min_rnr_timer);
+            p.write(min_rnr_timer);
+        }
+        self.mask |= C::IBV_QP_MIN_RNR_TIMER;
+        self
+    }
 }
 
 #[derive(Clone, Copy)]
