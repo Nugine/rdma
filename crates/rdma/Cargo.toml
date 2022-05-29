@@ -26,7 +26,6 @@ const-str = "0.3.1"
 
 [build-dependencies]
 bindgen = "0.59.2"
-cc = "1.0.73"
 pkg-config = "0.3.25"
 
 [package.metadata.docs.rs]
