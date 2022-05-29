@@ -100,6 +100,12 @@ impl AddressHandleOptions {
         self.attr.port_num = port_num;
         self
     }
+
+    #[inline]
+    pub fn global_route_header(&mut self, global_route_header: GlobalRoute) -> &mut Self {
+        self.attr.grh = global_route_header.into_ctype();
+        self
+    }
 }
 
 #[repr(C)]
@@ -109,6 +115,13 @@ pub struct GlobalRoute {
     pub sgid_index: u8,
     pub hop_limit: u8,
     pub traffic_class: u8,
+}
+
+impl GlobalRoute {
+    fn into_ctype(self) -> C::ibv_global_route {
+        // SAFETY: same repr
+        unsafe { mem::transmute(self) }
+    }
 }
 
 #[cfg(test)]
