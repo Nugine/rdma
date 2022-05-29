@@ -1,12 +1,13 @@
 #![deny(clippy::all)]
 
+use rdma::ah::{AddressHandle, GlobalRoute};
 use rdma::cc::CompChannel;
 use rdma::cq::CompletionQueue;
 use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList, Gid, GidEntry, LinkLayer, PortAttr};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
-use rdma::qp::{self, QueuePair};
+use rdma::qp::{self, Mtu, QueuePair};
 use rdma::qp::{QueuePairCapacity, QueuePairState, QueuePairType};
 use rdma::wr;
 
@@ -15,7 +16,7 @@ use std::mem::{self, ManuallyDrop};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 use std::{env, slice};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context as _, Result};
 use clap::Parser;
 use numeric_cast::NumericCast;
 use serde::{Deserialize, Serialize};
@@ -289,7 +290,38 @@ impl PingPong {
         {
             let mut options = qp::ModifyOptions::default();
 
-            options.qp_state(QueuePairState::ReadyToReceive);
+            let mut ah_attr = AddressHandle::options();
+            ah_attr
+                .dest_lid(remote_dest.lid)
+                .port_num(self.args.ib_port);
+
+            if remote_dest.gid.interface_id() != 0 {
+                ah_attr.global_route_header(GlobalRoute {
+                    dest_gid: remote_dest.gid,
+                    flow_label: 0,
+                    sgid_index: self.args.gid_idx.numeric_cast(),
+                    hop_limit: 1,
+                    traffic_class: 0,
+                });
+            }
+
+            options
+                .qp_state(QueuePairState::ReadyToReceive)
+                .path_mtu(Mtu::Mtu1024)
+                .dest_qp_num(remote_dest.qpn)
+                .rq_psn(remote_dest.psn)
+                .max_dest_rd_atomic(1)
+                .min_rnr_timer(12)
+                .ah_attr(ah_attr);
+
+            self.qp
+                .modify(options)
+                .context("failed to modify QP to RTR")?;
+        }
+
+        {
+            let mut options = qp::ModifyOptions::default();
+            options.qp_state(QueuePairState::ReadyToSend);
         }
 
         todo!()
