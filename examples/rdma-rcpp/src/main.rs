@@ -7,7 +7,10 @@ use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
-use rdma::qp::{self, QueuePair, QueuePairCapacity, QueuePairState, QueuePairType};
+use rdma::qp::{
+    self, QueuePair, QueuePairCapacity, QueuePairNumber, QueuePairState, QueuePairType,
+};
+use rdma::query::{Gid, GidEntry, LinkLayer, PortAttr};
 use rdma::wr;
 
 use std::mem::ManuallyDrop;
@@ -43,6 +46,10 @@ struct Args {
     /// port of IB device
     #[clap(short = 'i', long, default_value = "1")]
     ib_port: u8,
+
+    /// local port gid index
+    #[clap(short = 'g', long, default_value = "0")]
+    gid_idx: u32,
 }
 
 fn main() -> Result<()> {
@@ -71,6 +78,13 @@ fn main() -> Result<()> {
     pp.cq.req_notify_all()?;
 
     Ok(())
+}
+
+struct Dest {
+    lid: u16,
+    gid: Gid,
+    qpn: QueuePairNumber,
+    psn: u32,
 }
 
 struct PingPong {
@@ -206,5 +220,22 @@ impl PingPong {
         }
 
         Ok(())
+    }
+
+    fn self_dest(&self) -> Result<Dest> {
+        let port_attr = PortAttr::query(&self.ctx, self.args.ib_port)?;
+        let lid = port_attr.lid();
+        if port_attr.link_layer() != LinkLayer::Ethernet && lid == 0 {
+            return Err(anyhow!("can not get local LID"));
+        }
+
+        let gid_entry = GidEntry::query(&self.ctx, self.args.ib_port.into(), self.args.gid_idx)?;
+        let gid = gid_entry.gid();
+
+        let qpn = self.qp.number();
+
+        let psn = 0x123456;
+
+        Ok(Dest { lid, gid, qpn, psn })
     }
 }
