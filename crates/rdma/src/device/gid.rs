@@ -65,10 +65,6 @@ impl GidType {
 pub struct Gid(C::ibv_gid);
 
 impl Gid {
-    pub(crate) const fn into_ctype(self) -> C::ibv_gid {
-        self.0
-    }
-
     #[inline]
     #[must_use]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {

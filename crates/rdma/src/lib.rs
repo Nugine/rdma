@@ -25,6 +25,9 @@
     clippy::missing_docs_in_private_items, // TODO
 )]
 
+#[macro_use]
+mod utils;
+
 pub mod bindings {
     use libc::*;
 
@@ -36,9 +39,7 @@ pub mod bindings {
 }
 
 mod error;
-#[macro_use]
 mod resource;
-mod utils;
 mod weakset;
 
 pub mod device;

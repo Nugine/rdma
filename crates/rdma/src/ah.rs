@@ -105,22 +105,40 @@ pub struct GlobalRoute {
     pub traffic_class: u8,
 }
 
-// layout test
-const _: () = {
-    assert!(mem::size_of::<GlobalRoute>() == mem::size_of::<C::ibv_global_route>());
-    assert!(mem::align_of::<GlobalRoute>() == mem::align_of::<C::ibv_global_route>());
-    let gr = GlobalRoute {
-        dest_gid: Gid::from_bytes([0; 16]),
-        flow_label: 0,
-        sgid_index: 0,
-        hop_limit: 0,
-        traffic_class: 0,
-    };
-    let _ = C::ibv_global_route {
-        dgid: gr.dest_gid.into_ctype(),
-        flow_label: gr.flow_label,
-        sgid_index: gr.sgid_index,
-        hop_limit: gr.hop_limit,
-        traffic_class: gr.traffic_class,
-    };
-};
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn global_route_layout() {
+        assert_eq!(
+            mem::size_of::<GlobalRoute>(),
+            mem::size_of::<C::ibv_global_route>()
+        );
+        assert_eq!(
+            mem::align_of::<GlobalRoute>(),
+            mem::align_of::<C::ibv_global_route>()
+        );
+
+        assert_eq!(
+            offset_of!(GlobalRoute, dest_gid),
+            offset_of!(C::ibv_global_route, dgid)
+        );
+        assert_eq!(
+            offset_of!(GlobalRoute, flow_label),
+            offset_of!(C::ibv_global_route, flow_label)
+        );
+        assert_eq!(
+            offset_of!(GlobalRoute, sgid_index),
+            offset_of!(C::ibv_global_route, sgid_index)
+        );
+        assert_eq!(
+            offset_of!(GlobalRoute, hop_limit),
+            offset_of!(C::ibv_global_route, hop_limit)
+        );
+        assert_eq!(
+            offset_of!(GlobalRoute, traffic_class),
+            offset_of!(C::ibv_global_route, traffic_class)
+        );
+    }
+}

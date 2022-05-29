@@ -32,22 +32,6 @@ pub struct Sge {
     pub lkey: u32,
 }
 
-// layout test
-const _: () = {
-    assert!(mem::size_of::<Sge>() == mem::size_of::<C::ibv_sge>());
-    assert!(mem::align_of::<Sge>() == mem::align_of::<C::ibv_sge>());
-    let sge = Sge {
-        addr: 0,
-        length: 0,
-        lkey: 0,
-    };
-    let _ = C::ibv_sge {
-        addr: sge.addr,
-        length: sge.length,
-        lkey: sge.lkey,
-    };
-};
-
 /// SAFETY: ffi pointer data
 /// the actual usage is unsafe
 unsafe impl Send for Sge {}
@@ -110,5 +94,19 @@ impl RecvRequest {
         self.0.num_sge = sg_list.len().numeric_cast::<c_int>();
         self.0.sg_list = sg_list.as_mut_ptr().cast::<C::ibv_sge>();
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sge_layout() {
+        assert_eq!(mem::size_of::<Sge>(), mem::size_of::<C::ibv_sge>());
+        assert_eq!(mem::align_of::<Sge>(), mem::align_of::<C::ibv_sge>());
+        assert_eq!(offset_of!(Sge, addr), offset_of!(C::ibv_sge, addr));
+        assert_eq!(offset_of!(Sge, length), offset_of!(C::ibv_sge, length));
+        assert_eq!(offset_of!(Sge, lkey), offset_of!(C::ibv_sge, lkey));
     }
 }

@@ -62,3 +62,32 @@ pub fn void_ptr_to_usize(p: *mut c_void) -> usize {
 pub fn u32_as_c_uint(val: u32) -> c_uint {
     val as c_uint
 }
+
+/// Calculates the offset of the specified field from the start of the named struct.
+/// This macro is impossible to be const until `feature(const_ptr_offset_from)` is stable.
+macro_rules! offset_of {
+    ($ty: path, $field: tt) => {{
+        // ensure the type is a named struct
+        // ensure the field exists and is accessible
+        #[allow(clippy::unneeded_field_pattern)]
+        let $ty { $field: _, .. };
+
+        let uninit = <::core::mem::MaybeUninit<$ty>>::uninit(); // const since 1.36
+
+        let base_ptr: *const $ty = uninit.as_ptr(); // const since 1.59
+
+        #[allow(unused_unsafe)]
+        // SAFETY: get raw ptr
+        let field_ptr = unsafe { ::core::ptr::addr_of!((*base_ptr).$field) }; // since 1.51
+
+        // // the const version requires feature(const_ptr_offset_from)
+        // // https://github.com/rust-lang/rust/issues/92980
+        // #[allow(unused_unsafe)]
+        // unsafe { (field_ptr as *const u8).offset_from(base_ptr as *const u8) as usize }
+
+        #[allow(clippy::integer_arithmetic, clippy::as_conversions)]
+        {
+            (field_ptr as usize) - (base_ptr as usize)
+        }
+    }};
+}

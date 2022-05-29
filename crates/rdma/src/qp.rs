@@ -186,26 +186,6 @@ pub struct QueuePairCapacity {
     pub max_inline_data: u32,
 }
 
-// layout test
-const _: () = {
-    assert!(mem::size_of::<QueuePairCapacity>() == mem::size_of::<C::ibv_qp_cap>());
-    assert!(mem::align_of::<QueuePairCapacity>() == mem::align_of::<C::ibv_qp_cap>());
-    let cap = QueuePairCapacity {
-        max_send_wr: 0,
-        max_recv_wr: 0,
-        max_send_sge: 0,
-        max_recv_sge: 0,
-        max_inline_data: 0,
-    };
-    let _ = C::ibv_qp_cap {
-        max_send_wr: cap.max_send_wr,
-        max_recv_wr: cap.max_recv_wr,
-        max_send_sge: cap.max_send_sge,
-        max_recv_sge: cap.max_recv_sge,
-        max_inline_data: cap.max_inline_data,
-    };
-};
-
 impl Default for QueuePairCapacity {
     #[inline]
     fn default() -> Self {
@@ -543,5 +523,42 @@ impl Mtu {
     fn to_c_uint(self) -> c_uint {
         #[allow(clippy::as_conversions)]
         u32_as_c_uint(self as u32)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qp_cap_layout() {
+        assert_eq!(
+            mem::size_of::<QueuePairCapacity>(),
+            mem::size_of::<C::ibv_qp_cap>()
+        );
+        assert_eq!(
+            mem::align_of::<QueuePairCapacity>(),
+            mem::align_of::<C::ibv_qp_cap>()
+        );
+
+        assert_eq!(
+            offset_of!(QueuePairCapacity, max_send_wr),
+            offset_of!(C::ibv_qp_cap, max_send_wr)
+        );
+        assert_eq!(
+            offset_of!(QueuePairCapacity, max_recv_wr),
+            offset_of!(C::ibv_qp_cap, max_recv_wr)
+        );
+        assert_eq!(
+            offset_of!(QueuePairCapacity, max_send_sge),
+            offset_of!(C::ibv_qp_cap, max_send_sge)
+        );
+        assert_eq!(
+            offset_of!(QueuePairCapacity, max_recv_sge),
+            offset_of!(C::ibv_qp_cap, max_recv_sge)
+        );
+        assert_eq!(
+            offset_of!(QueuePairCapacity, max_inline_data),
+            offset_of!(C::ibv_qp_cap, max_inline_data)
+        );
     }
 }
