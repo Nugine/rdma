@@ -50,7 +50,7 @@ impl PortAttr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum PortState {
     Nop = c_uint_to_u32(C::IBV_PORT_NOP),
@@ -75,7 +75,7 @@ impl PortState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum LinkLayer {
     Ethernet = c_uint_to_u32(C::IBV_LINK_LAYER_ETHERNET),

@@ -301,7 +301,7 @@ impl QueuePairNumber {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum QueuePairType {
     RC = c_uint_to_u32(C::IBV_QPT_RC),
@@ -440,7 +440,7 @@ impl QueuePairAttr {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum QueuePairState {
     Reset = c_uint_to_u32(C::IBV_QPS_RESET),

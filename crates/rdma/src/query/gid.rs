@@ -40,7 +40,7 @@ impl GidEntry {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum GidType {
     IB = c_uint_to_u32(C::IBV_GID_TYPE_IB),

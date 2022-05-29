@@ -66,7 +66,7 @@ impl Drop for Owner {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum MemoryWindowType {
     Type1 = c_uint_to_u32(C::IBV_MW_TYPE_1),
