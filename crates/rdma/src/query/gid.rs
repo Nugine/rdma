@@ -158,6 +158,19 @@ mod serde_impl {
     }
 }
 
+#[cfg(feature = "bytemuck")]
+mod bytemuck_impl {
+    use super::Gid;
+
+    use bytemuck::{Pod, Zeroable};
+
+    /// SAFETY: POD
+    unsafe impl Zeroable for Gid {}
+
+    /// SAFETY: POD
+    unsafe impl Pod for Gid {}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
