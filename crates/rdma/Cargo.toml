@@ -2,6 +2,13 @@
 name = "rdma"
 version = "0.1.0-dev"
 edition = "2021"
+description = "Low-level RDMA API"
+license = "MIT"
+repository = "https://github.com/Nugine/rdma"
+readme = "README.md"
+documentation = "https://docs.rs/rdma"
+keywords = ["rdma", "ibverbs", "network"]
+categories = ["asynchronous", "hardware-support", "network-programming"]
 
 [dependencies]
 bitflags = "1.3.2"

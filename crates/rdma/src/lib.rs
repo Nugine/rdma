@@ -1,4 +1,4 @@
-#![deny(clippy::all, clippy::pedantic, clippy::restriction)]
+#![deny(clippy::all, clippy::pedantic, clippy::restriction, clippy::cargo)]
 #![allow(
     clippy::module_name_repetitions,
     clippy::blanket_clippy_restriction_lints,
