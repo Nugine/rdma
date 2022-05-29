@@ -1,0 +1,64 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule: # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#onschedule
+    - cron: '0 0 * * 0' # at midnight of each sunday
+
+
+name: CI
+
+jobs:
+  develop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: linux-rdma/rdma-core
+          path: rdma-core
+      - name: Build rdma-core
+        run: |
+          set -x
+          sudo apt install \
+            build-essential cmake gcc \
+            libudev-dev libnl-3-dev libnl-route-3-dev \
+            ninja-build pkg-config valgrind
+          pushd rdma-core
+          bash build.sh
+          echo "RDMA_CORE=$PWD" >> $GITHUB_ENV
+          export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PWD/build/lib/pkgconfig
+          popd
+          pkg-config --modversion libibverbs
+          pkg-config --modversion librdmacm
+      - uses: actions/checkout@v2
+        with:
+          path: rdma
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - name: Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Rust check
+        run: |
+          set -x
+          pushd rdma
+
+          RDMA_CORE=${{ env.RDMA_CORE }}
+          export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$RDMA_CORE/build/lib/pkgconfig
+          export PATH=$PATH:$RDMA_CORE/build/bin
+          export LD_LIBRARY_PATH=$RDMA_CORE/build/lib
+
+          pkg-config --modversion libibverbs
+          pkg-config --modversion librdmacm
+
+          cargo fmt --all -- --check
+          cargo clippy --all-features -- -D warnings
+          cargo +nightly  build --release
+          cargo +stable   build --release
