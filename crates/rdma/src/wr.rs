@@ -1,7 +1,8 @@
 use crate::bindings as C;
+use crate::utils::{c_uint_to_u32, u32_as_c_uint};
 
 use std::mem;
-use std::os::raw::c_int;
+use std::os::raw::{c_int, c_uint};
 
 use numeric_cast::NumericCast;
 
@@ -66,6 +67,12 @@ impl SendRequest {
         self.0.sg_list = sg_list.as_mut_ptr().cast::<C::ibv_sge>();
         self
     }
+
+    #[inline]
+    pub fn opcode(&mut self, opcode: Opcode) -> &mut Self {
+        self.0.opcode = opcode.to_c_uint();
+        self
+    }
 }
 
 impl RecvRequest {
@@ -94,6 +101,24 @@ impl RecvRequest {
         self.0.num_sge = sg_list.len().numeric_cast::<c_int>();
         self.0.sg_list = sg_list.as_mut_ptr().cast::<C::ibv_sge>();
         self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Opcode {
+    Send = c_uint_to_u32(C::IBV_WR_SEND),
+    SendWithImm = c_uint_to_u32(C::IBV_WR_SEND_WITH_IMM),
+    Write = c_uint_to_u32(C::IBV_WR_RDMA_WRITE),
+    Read = c_uint_to_u32(C::IBV_WR_RDMA_READ),
+    AtomicFetchAdd = c_uint_to_u32(C::IBV_WR_ATOMIC_FETCH_AND_ADD),
+    AtomicCAS = c_uint_to_u32(C::IBV_WR_ATOMIC_CMP_AND_SWP),
+}
+
+impl Opcode {
+    fn to_c_uint(self) -> c_uint {
+        #[allow(clippy::as_conversions)]
+        u32_as_c_uint(self as u32)
     }
 }
 
