@@ -22,7 +22,7 @@ use anyhow::{anyhow, Context as _, Result};
 use clap::Parser;
 use numeric_cast::NumericCast;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::info;
 
 #[derive(Debug, clap::Parser)]
 struct Opt {
@@ -99,16 +99,15 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
     let mut recv_cnt = 0;
     let mut send_cnt = 0;
     let mut recv_wr_cnt = pp.args.rx_depth;
+
     const UNINIT_WC: MaybeUninit<WorkCompletion> = MaybeUninit::uninit();
-    let mut wc_buf = [UNINIT_WC; 64];
+    let mut wc_buf = [UNINIT_WC; 2];
 
     info!("start iteration");
 
     let t0 = Instant::now();
 
     while recv_cnt < pp.args.iters || send_cnt < pp.args.iters {
-        debug!(?recv_cnt, ?send_cnt);
-
         pp.cc.wait_cq_event()?;
         pp.cq.ack_cq_events(1);
 
@@ -116,23 +115,18 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
 
         let wcs = pp.cq.poll(&mut wc_buf)?;
 
-        debug!("poll {} wcs", wcs.len());
-
         for wc in wcs {
             wc.status()?;
 
             match wc.wr_id() {
                 PingPong::SEND_WRID => {
                     send_cnt += 1;
-                    debug!(?send_cnt);
                     if send_cnt < pp.args.iters {
                         unsafe { pp.post_send()? }
                     }
                 }
                 PingPong::RECV_WRID => {
                     recv_cnt += 1;
-                    debug!(?recv_cnt);
-
                     recv_wr_cnt -= 1;
                     if recv_wr_cnt <= 1 {
                         unsafe { pp.post_recv(pp.args.rx_depth)? }
@@ -154,7 +148,7 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
         "{} bytes in {:.2} seconds = {:.2} Mbps",
         bytes,
         time,
-        (bytes * 8) as f64 / time
+        (bytes * 8) as f64 / 1e6 / time
     );
     println!(
         "{} iters in {:.2} seconds = {:.2} us/iter",
