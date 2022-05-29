@@ -1,3 +1,4 @@
+use crate::ah::AddressHandleOptions;
 use crate::bindings as C;
 use crate::cq::{self, CompletionQueue};
 use crate::error::{create_resource, from_errno};
@@ -427,6 +428,17 @@ impl ModifyOptions {
             p.write(min_rnr_timer);
         }
         self.mask |= C::IBV_QP_MIN_RNR_TIMER;
+        self
+    }
+
+    #[inline]
+    pub fn ah_attr(&mut self, ah_attr: AddressHandleOptions) -> &mut Self {
+        // SAFETY: write uninit field
+        unsafe {
+            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).ah_attr);
+            p.write(ah_attr.into_ctype());
+        }
+        self.mask |= C::IBV_QP_AV;
         self
     }
 }

@@ -72,6 +72,10 @@ impl Default for AddressHandleOptions {
 }
 
 impl AddressHandleOptions {
+    pub(crate) fn into_ctype(self) -> C::ibv_ah_attr {
+        self.attr
+    }
+
     #[inline]
     pub fn dest_lid(&mut self, dest_lid: u16) -> &mut Self {
         self.attr.dlid = dest_lid;
