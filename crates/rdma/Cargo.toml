@@ -1,6 +1,6 @@
 [package]
 name = "rdma"
-version = "0.1.1-dev"
+version = "0.1.1"
 edition = "2021"
 description = "Low-level RDMA API"
 license = "MIT"
