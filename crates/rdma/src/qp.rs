@@ -311,116 +311,53 @@ impl Default for ModifyOptions {
     }
 }
 
+macro_rules! modify_option {
+    ($mask: ident, $field: ident, $ty: ty, $($cvt:tt)+) => {
+        #[inline]
+        pub fn $field(&mut self, $field: $ty) -> &mut Self {
+            // SAFETY: write uninit field
+            unsafe {
+                let attr = self.attr.as_mut_ptr();
+                let p = ptr::addr_of_mut!((*attr).$field);
+                p.write($($cvt)+);
+            }
+            self.mask |= C::$mask;
+            self
+        }
+    };
+}
+
 impl ModifyOptions {
-    #[inline]
-    pub fn qp_state(&mut self, qp_state: QueuePairState) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).qp_state);
-            p.write(qp_state.to_c_uint());
-        }
-        self.mask |= C::IBV_QP_STATE;
-        self
-    }
-
-    #[inline]
-    pub fn pkey_index(&mut self, pkey_index: u16) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).pkey_index);
-            p.write(pkey_index);
-        }
-        self.mask |= C::IBV_QP_PKEY_INDEX;
-        self
-    }
-
-    #[inline]
-    pub fn port_num(&mut self, port_num: u8) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).port_num);
-            p.write(port_num);
-        }
-        self.mask |= C::IBV_QP_PORT;
-        self
-    }
-
-    #[inline]
-    pub fn qp_access_flags(&mut self, access_flags: AccessFlags) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).qp_access_flags);
-            p.write(access_flags.to_c_uint());
-        }
-        self.mask |= C::IBV_QP_ACCESS_FLAGS;
-        self
-    }
-
-    #[inline]
-    pub fn path_mtu(&mut self, path_mtu: Mtu) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).path_mtu);
-            p.write(path_mtu.to_c_uint());
-        }
-        self.mask |= C::IBV_QP_PATH_MTU;
-        self
-    }
-
-    #[inline]
-    pub fn dest_qp_num(&mut self, dest_qp_num: u32) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).dest_qp_num);
-            p.write(dest_qp_num);
-        }
-        self.mask |= C::IBV_QP_DEST_QPN;
-        self
-    }
-
-    #[inline]
-    pub fn rq_psn(&mut self, rq_psn: u32) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).rq_psn);
-            p.write(rq_psn);
-        }
-        self.mask |= C::IBV_QP_RQ_PSN;
-        self
-    }
-
-    #[inline]
-    pub fn max_dest_rd_atomic(&mut self, max_dest_rd_atomic: u8) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).max_dest_rd_atomic);
-            p.write(max_dest_rd_atomic);
-        }
-        self.mask |= C::IBV_QP_MAX_DEST_RD_ATOMIC;
-        self
-    }
-
-    #[inline]
-    pub fn min_rnr_timer(&mut self, min_rnr_timer: u8) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).min_rnr_timer);
-            p.write(min_rnr_timer);
-        }
-        self.mask |= C::IBV_QP_MIN_RNR_TIMER;
-        self
-    }
-
-    #[inline]
-    pub fn ah_attr(&mut self, ah_attr: AddressHandleOptions) -> &mut Self {
-        // SAFETY: write uninit field
-        unsafe {
-            let p = ptr::addr_of_mut!((*self.attr.as_mut_ptr()).ah_attr);
-            p.write(ah_attr.into_ctype());
-        }
-        self.mask |= C::IBV_QP_AV;
-        self
-    }
+    modify_option!(IBV_QP_STATE, qp_state, QueuePairState, qp_state.to_c_uint());
+    modify_option!(IBV_QP_PKEY_INDEX, pkey_index, u16, pkey_index);
+    modify_option!(IBV_QP_PORT, port_num, u8, port_num);
+    modify_option!(
+        IBV_QP_ACCESS_FLAGS,
+        qp_access_flags,
+        AccessFlags,
+        qp_access_flags.to_c_uint()
+    );
+    modify_option!(IBV_QP_PATH_MTU, path_mtu, Mtu, path_mtu.to_c_uint());
+    modify_option!(IBV_QP_DEST_QPN, dest_qp_num, u32, dest_qp_num);
+    modify_option!(IBV_QP_RQ_PSN, rq_psn, u32, rq_psn);
+    modify_option!(
+        IBV_QP_MAX_DEST_RD_ATOMIC,
+        max_dest_rd_atomic,
+        u8,
+        max_dest_rd_atomic
+    );
+    modify_option!(IBV_QP_MIN_RNR_TIMER, min_rnr_timer, u8, min_rnr_timer);
+    modify_option!(
+        IBV_QP_AV,
+        ah_attr,
+        AddressHandleOptions,
+        ah_attr.into_ctype()
+    );
+    modify_option!(IBV_QP_TIMEOUT, timeout, u8, timeout);
+    modify_option!(IBV_QP_RETRY_CNT, retry_cnt, u8, retry_cnt);
+    modify_option!(IBV_QP_RNR_RETRY, rnr_retry, u8, rnr_retry);
+    modify_option!(IBV_QP_SQ_PSN, sq_psn, u32, sq_psn);
+    modify_option!(IBV_QP_MAX_QP_RD_ATOMIC, max_rd_atomic, u8, max_rd_atomic);
 }
 
 #[derive(Clone, Copy)]
