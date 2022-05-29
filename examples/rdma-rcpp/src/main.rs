@@ -331,7 +331,8 @@ impl PingPong {
 
         send_wr
             .id(Self::SEND_WRID)
-            .sg_list(slice::from_mut(&mut sge));
+            .sg_list(slice::from_mut(&mut sge))
+            .opcode(wr::Opcode::Send);
 
         self.qp.post_send(&mut send_wr)?;
 
