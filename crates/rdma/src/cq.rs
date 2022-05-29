@@ -128,10 +128,10 @@ impl CompletionQueue {
     }
 
     #[inline]
-    pub fn poll(
+    pub fn poll<'wc>(
         &self,
-        buf: &mut [MaybeUninit<WorkCompletion>],
-    ) -> io::Result<&mut [WorkCompletion]> {
+        buf: &'wc mut [MaybeUninit<WorkCompletion>],
+    ) -> io::Result<&'wc mut [WorkCompletion]> {
         // SAFETY: ffi
         unsafe {
             let num_entries: c_int = buf.len().numeric_cast();
