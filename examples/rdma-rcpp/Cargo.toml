@@ -5,10 +5,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
+bincode = "1.3.3"
 bytemuck = { version = "1.9.1", features = ["derive"] }
 clap = { version = "3.1.18", features = ["derive"] }
 libc = "0.2.126"
 numeric_cast = "0.1.2"
-rdma = { path = "../../crates/rdma" }
+rdma = { path = "../../crates/rdma", features = ["serde"] }
+serde = { version = "1.0.137", features = ["derive"] }
 tracing = "0.1.34"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }

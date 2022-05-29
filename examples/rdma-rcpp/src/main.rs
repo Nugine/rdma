@@ -1,15 +1,13 @@
 #![deny(clippy::all)]
 
-use numeric_cast::NumericCast;
 use rdma::cc::CompChannel;
 use rdma::cq::CompletionQueue;
 use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
-use rdma::qp::{
-    self, QueuePair, QueuePairCapacity, QueuePairNumber, QueuePairState, QueuePairType,
-};
+use rdma::qp::{self, QueuePair};
+use rdma::qp::{QueuePairCapacity, QueuePairState, QueuePairType};
 use rdma::query::{Gid, GidEntry, LinkLayer, PortAttr};
 use rdma::wr;
 
@@ -19,6 +17,8 @@ use std::{env, slice};
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use numeric_cast::NumericCast;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
 #[derive(Debug, clap::Parser)]
@@ -80,10 +80,11 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[derive(Serialize, Deserialize)]
 struct Dest {
     lid: u16,
     gid: Gid,
-    qpn: QueuePairNumber,
+    qpn: u32,
     psn: u32,
 }
 
@@ -232,7 +233,7 @@ impl PingPong {
         let gid_entry = GidEntry::query(&self.ctx, self.args.ib_port.into(), self.args.gid_idx)?;
         let gid = gid_entry.gid();
 
-        let qpn = self.qp.number();
+        let qpn = self.qp.qp_num();
 
         let psn = 0x123456;
 
