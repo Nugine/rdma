@@ -76,11 +76,19 @@ fn main() -> Result<()> {
         None => info!("run server"),
     }
 
+    run(args, server)
+}
+
+fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
     let mut pp = PingPong::new(args, server)?;
 
     unsafe { pp.post_recv(pp.args.rx_depth)? }
 
     pp.cq.req_notify_all()?;
+
+    pp.handshake()?;
+
+    let mut pending = PingPong::RECV_WRID;
 
     Ok(())
 }
@@ -97,12 +105,17 @@ struct PingPong {
     args: Args,
     server: Option<IpAddr>,
 
-    mr: ManuallyDrop<MemoryRegion>,
+    send_mr: ManuallyDrop<MemoryRegion>,
+    recv_mr: ManuallyDrop<MemoryRegion>,
+
     qp: QueuePair,
     cq: CompletionQueue,
     pd: ProtectionDomain,
     cc: CompChannel,
     ctx: Context,
+
+    send_buf: Vec<u8>,
+    recv_buf: Vec<u8>,
 
     can_send_inline: bool,
 }
@@ -110,7 +123,10 @@ struct PingPong {
 impl Drop for PingPong {
     fn drop(&mut self) {
         // deregister the memory region firstly
-        unsafe { ManuallyDrop::drop(&mut self.mr) }
+        unsafe {
+            ManuallyDrop::drop(&mut self.send_mr);
+            ManuallyDrop::drop(&mut self.recv_mr)
+        }
     }
 }
 
@@ -119,10 +135,9 @@ impl PingPong {
     const SEND_WRID: u64 = 1 << 1;
 
     fn new(args: Args, server: Option<IpAddr>) -> Result<Self> {
-        let mut buf: Vec<u8> = {
-            assert_ne!(args.size, 0);
-            vec![0xcc; args.size]
-        };
+        assert_ne!(args.size, 0);
+        let mut send_buf: Vec<u8> = vec![0; args.size];
+        let mut recv_buf: Vec<u8> = vec![0; args.size];
 
         let ctx: _ = {
             let dev_list = DeviceList::available()?;
@@ -134,9 +149,15 @@ impl PingPong {
 
         let pd = ProtectionDomain::alloc(&ctx)?;
 
-        let mr = unsafe {
-            let addr = buf.as_mut_ptr();
-            let length = buf.len();
+        let send_mr = unsafe {
+            let addr = send_buf.as_mut_ptr();
+            let length = send_buf.len();
+            let access_flags = AccessFlags::LOCAL_WRITE;
+            MemoryRegion::register(&pd, addr, length, access_flags)?
+        };
+        let recv_mr = unsafe {
+            let addr = recv_buf.as_mut_ptr();
+            let length = recv_buf.len();
             let access_flags = AccessFlags::LOCAL_WRITE;
             MemoryRegion::register(&pd, addr, length, access_flags)?
         };
@@ -185,12 +206,15 @@ impl PingPong {
         Ok(Self {
             args,
             server,
-            mr: ManuallyDrop::new(mr),
+            send_mr: ManuallyDrop::new(send_mr),
+            recv_mr: ManuallyDrop::new(recv_mr),
             qp,
             cq,
             pd,
             cc,
             ctx,
+            send_buf,
+            recv_buf,
             can_send_inline,
         })
     }
@@ -211,9 +235,9 @@ impl PingPong {
 
     unsafe fn post_recv(&mut self, n: usize) -> Result<()> {
         let mut sge = wr::Sge {
-            addr: self.mr.addr_u64(),
-            length: self.mr.length().numeric_cast(),
-            lkey: self.mr.lkey(),
+            addr: self.recv_mr.addr_u64(),
+            length: self.recv_mr.length().numeric_cast(),
+            lkey: self.recv_mr.lkey(),
         };
         let mut recv_wr = wr::RecvRequest::zeroed();
 
@@ -244,49 +268,7 @@ impl PingPong {
         Ok(Dest { qpn, psn, lid, gid })
     }
 
-    fn handshake(&mut self) -> Result<()> {
-        let local_dest = self.local_dest()?;
-
-        info!("local dest: {:?}", local_dest);
-
-        let mut msg_buf = bincode::serialize(&local_dest)?;
-        let mut msg_size = msg_buf.len().numeric_cast::<u64>().to_be_bytes();
-
-        let mut stream = match self.server {
-            Some(ip) => {
-                // client side
-                let server_addr = SocketAddr::from((ip, self.args.port));
-                info!("connecting to {}", server_addr);
-                TcpStream::connect(&server_addr)?
-            }
-            None => {
-                // server side
-                let server_addr = SocketAddr::from((Ipv6Addr::UNSPECIFIED, self.args.port));
-                let listener = TcpListener::bind(server_addr)?;
-                info!("listening on port {}", self.args.port);
-                let (stream, peer_addr) = listener.accept()?;
-                info!("accepted connection from {}", peer_addr);
-                stream
-            }
-        };
-
-        stream.write_all(&msg_size)?;
-        stream.write_all(&msg_buf)?;
-        stream.flush()?;
-
-        stream.read_exact(&mut msg_size)?;
-
-        let size: usize = u64::from_be_bytes(msg_size).numeric_cast();
-        assert!(size <= mem::size_of::<Dest>());
-
-        msg_buf.clear();
-        msg_buf.resize(size, 0);
-
-        stream.read_exact(&mut msg_buf)?;
-
-        let remote_dest: Dest = bincode::deserialize(&msg_buf)?;
-        info!("remote dest: {:?}", remote_dest);
-
+    fn forward_qp(&mut self, local_dest: &Dest, remote_dest: &Dest) -> Result<()> {
         {
             let mut options = qp::ModifyOptions::default();
 
@@ -321,9 +303,71 @@ impl PingPong {
 
         {
             let mut options = qp::ModifyOptions::default();
-            options.qp_state(QueuePairState::ReadyToSend);
+            options
+                .qp_state(QueuePairState::ReadyToSend)
+                .timeout(14)
+                .retry_cnt(7)
+                .rnr_retry(7)
+                .sq_psn(local_dest.psn)
+                .max_rd_atomic(1);
+
+            self.qp
+                .modify(options)
+                .context("failed to modify QP to RTS")?;
         }
 
-        todo!()
+        Ok(())
+    }
+
+    fn handshake(&mut self) -> Result<()> {
+        let local_dest = self.local_dest()?;
+        info!("local dest: {:?}", local_dest);
+
+        let mut stream = match self.server {
+            Some(ip) => {
+                // client side
+                let server_addr = SocketAddr::from((ip, self.args.port));
+                info!("connecting to {}", server_addr);
+                TcpStream::connect(&server_addr)?
+            }
+            None => {
+                // server side
+                let server_addr = SocketAddr::from((Ipv6Addr::UNSPECIFIED, self.args.port));
+                let listener = TcpListener::bind(server_addr)?;
+                info!("listening on port {}", self.args.port);
+                let (stream, peer_addr) = listener.accept()?;
+                info!("accepted connection from {}", peer_addr);
+                stream
+            }
+        };
+
+        let send_dest = |stream: &mut TcpStream, msg_buf: &mut Vec<u8>, dest: &Dest| {
+            msg_buf.clear();
+            bincode::serialize_into(&mut *msg_buf, &dest)?;
+            let msg_size: u8 = msg_buf.len().numeric_cast();
+            stream.write_all(&[msg_size])?;
+            stream.write_all(msg_buf)?;
+            stream.flush()?;
+            anyhow::Result::<()>::Ok(())
+        };
+
+        let recv_dest = |stream: &mut TcpStream, msg_buf: &mut Vec<u8>| {
+            let mut msg_size = [0u8];
+            stream.read_exact(&mut msg_size)?;
+            msg_buf.clear();
+            msg_buf.resize(msg_size[0].into(), 0);
+            stream.read_exact(&mut *msg_buf)?;
+            let dest = bincode::deserialize::<Dest>(&*msg_buf)?;
+            anyhow::Result::<Dest>::Ok(dest)
+        };
+
+        let mut msg_buf = Vec::new();
+        send_dest(&mut stream, &mut msg_buf, &local_dest)?;
+        let remote_dest = recv_dest(&mut stream, &mut msg_buf)?;
+        info!("remote dest: {:?}", remote_dest);
+
+        self.forward_qp(&local_dest, &remote_dest)?;
+
+        Ok(())
     }
 }
