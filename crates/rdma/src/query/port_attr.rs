@@ -42,6 +42,12 @@ impl PortAttr {
     pub fn link_layer(&self) -> LinkLayer {
         LinkLayer::from_c_uint(c_uint::from(self.0.link_layer))
     }
+
+    #[inline]
+    #[must_use]
+    pub fn lid(&self) -> u16 {
+        self.0.lid
+    }
 }
 
 #[derive(Debug)]
