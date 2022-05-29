@@ -65,15 +65,19 @@ impl GidType {
 pub struct Gid(C::ibv_gid);
 
 impl Gid {
+    pub(crate) const fn into_ctype(self) -> C::ibv_gid {
+        self.0
+    }
+
     #[inline]
     #[must_use]
-    pub fn from_bytes(bytes: [u8; 16]) -> Self {
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(C::ibv_gid { raw: bytes })
     }
 
     #[inline]
     #[must_use]
-    pub fn as_bytes(&self) -> &[u8; 16] {
+    pub const fn as_bytes(&self) -> &[u8; 16] {
         // SAFETY: type raw bytes
         unsafe { &self.0.raw }
     }
@@ -86,14 +90,14 @@ impl Gid {
 
     #[inline]
     #[must_use]
-    pub fn subnet_prefix(&self) -> u64 {
+    pub const fn subnet_prefix(&self) -> u64 {
         // SAFETY: POD
         unsafe { self.0.global.subnet_prefix }
     }
 
     #[inline]
     #[must_use]
-    pub fn interface_id(&self) -> u64 {
+    pub const fn interface_id(&self) -> u64 {
         // SAFETY: POD
         unsafe { self.0.global.interface_id }
     }

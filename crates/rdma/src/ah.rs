@@ -1,6 +1,7 @@
 use crate::bindings as C;
 use crate::error::create_resource;
 use crate::pd::{self, ProtectionDomain};
+use crate::query::Gid;
 use crate::resource::Resource;
 
 use std::io;
@@ -94,3 +95,32 @@ impl AddressHandleOptions {
         self
     }
 }
+
+#[repr(C)]
+pub struct GlobalRoute {
+    pub dest_gid: Gid,
+    pub flow_label: u32,
+    pub sgid_index: u8,
+    pub hop_limit: u8,
+    pub traffic_class: u8,
+}
+
+// layout test
+const _: () = {
+    assert!(mem::size_of::<GlobalRoute>() == mem::size_of::<C::ibv_global_route>());
+    assert!(mem::align_of::<GlobalRoute>() == mem::align_of::<C::ibv_global_route>());
+    let gr = GlobalRoute {
+        dest_gid: Gid::from_bytes([0; 16]),
+        flow_label: 0,
+        sgid_index: 0,
+        hop_limit: 0,
+        traffic_class: 0,
+    };
+    let _ = C::ibv_global_route {
+        dgid: gr.dest_gid.into_ctype(),
+        flow_label: gr.flow_label,
+        sgid_index: gr.sgid_index,
+        hop_limit: gr.hop_limit,
+        traffic_class: gr.traffic_class,
+    };
+};
