@@ -13,6 +13,12 @@ pub struct AddressHandle(Arc<Owner>);
 
 impl AddressHandle {
     #[inline]
+    #[must_use]
+    pub fn options() -> AddressHandleOptions {
+        AddressHandleOptions::default()
+    }
+
+    #[inline]
     pub fn create(pd: &ProtectionDomain, mut options: AddressHandleOptions) -> io::Result<Self> {
         // SAFETY: ffi
         let owner = unsafe {
