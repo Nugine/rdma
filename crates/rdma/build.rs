@@ -19,7 +19,7 @@ fn link_rdma_core(lib_name: &str, pkg_name: &str, version: &str, include_paths: 
 }
 
 fn main() {
-    if cfg!(docsrs) {
+    if cfg!(docsrs) || env::var("DOCS_RS").is_ok() {
         return;
     }
 
