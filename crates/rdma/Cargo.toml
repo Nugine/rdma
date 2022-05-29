@@ -1,11 +1,11 @@
 [package]
 name = "rdma"
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2021"
 description = "Low-level RDMA API"
 license = "MIT"
 repository = "https://github.com/Nugine/rdma"
-readme = "README.md"
+readme = "../../README.md"
 documentation = "https://docs.rs/rdma"
 keywords = ["rdma", "ibverbs", "network"]
 categories = ["asynchronous", "hardware-support", "network-programming"]
