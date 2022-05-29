@@ -3,12 +3,11 @@
 use rdma::cc::CompChannel;
 use rdma::cq::CompletionQueue;
 use rdma::ctx::Context;
-use rdma::device::{Device, DeviceList};
+use rdma::device::{Device, DeviceList, Gid, GidEntry, LinkLayer, PortAttr};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
 use rdma::qp::{self, QueuePair};
 use rdma::qp::{QueuePairCapacity, QueuePairState, QueuePairType};
-use rdma::query::{Gid, GidEntry, LinkLayer, PortAttr};
 use rdma::wr;
 
 use std::io::{Read, Write};

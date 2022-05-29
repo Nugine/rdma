@@ -1,7 +1,7 @@
 use crate::bindings as C;
+use crate::device::Gid;
 use crate::error::create_resource;
 use crate::pd::{self, ProtectionDomain};
-use crate::query::Gid;
 use crate::resource::Resource;
 
 use std::io;

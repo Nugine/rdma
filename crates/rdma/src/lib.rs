@@ -17,7 +17,8 @@
     clippy::enum_glob_use,
     clippy::exhaustive_enums,
     clippy::exhaustive_structs,
-    clippy::unseparated_literal_suffix
+    clippy::unseparated_literal_suffix,
+    clippy::mod_module_files
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
@@ -53,14 +54,3 @@ pub mod pd;
 pub mod qp;
 pub mod wc;
 pub mod wr;
-
-pub mod query {
-    mod device_attr;
-    pub use self::device_attr::*;
-
-    mod port_attr;
-    pub use self::port_attr::*;
-
-    mod gid;
-    pub use self::gid::*;
-}
