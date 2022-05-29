@@ -7,7 +7,7 @@ use rdma::ctx::Context;
 use rdma::device::{Device, DeviceList};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
-use rdma::qp::{self, QueuePair, QueuePairState, QueuePairType};
+use rdma::qp::{self, QueuePair, QueuePairCapacity, QueuePairState, QueuePairType};
 
 use std::env;
 use std::net::{IpAddr, SocketAddr};
@@ -100,10 +100,13 @@ fn run(args: &Args, server: Option<IpAddr>) -> Result<()> {
         options
             .send_cq(&cq)
             .recv_cq(&cq)
-            .max_send_wr(1)
-            .max_recv_wr(args.rx_depth.numeric_cast())
-            .max_send_sge(1)
-            .max_recv_sge(1)
+            .cap(QueuePairCapacity {
+                max_send_wr: 1,
+                max_recv_wr: args.rx_depth.numeric_cast(),
+                max_send_sge: 1,
+                max_recv_sge: 1,
+                max_inline_data: 0,
+            })
             .qp_type(QueuePairType::RC);
         QueuePair::create(&pd, options)?
     };
@@ -112,8 +115,8 @@ fn run(args: &Args, server: Option<IpAddr>) -> Result<()> {
         let mut options = qp::QueryOptions::default();
         options.cap();
         let qp_attr = qp.query(options)?;
-        let max_inline_data = qp_attr.max_inline_data().unwrap().numeric_cast::<usize>();
-        max_inline_data >= args.rx_depth
+        let cap = qp_attr.cap().unwrap();
+        cap.max_inline_data.numeric_cast::<usize>() >= args.rx_depth
     };
 
     {

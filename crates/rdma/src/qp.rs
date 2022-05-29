@@ -65,7 +65,7 @@ impl QueuePair {
 
             qp_attr.qp_type = options.qp_type.unwrap_unchecked().to_c_uint();
             qp_attr.sq_sig_all = bool_to_c_int(options.sq_sig_all.unwrap_unchecked());
-            qp_attr.cap = options.cap;
+            qp_attr.cap = mem::transmute(options.cap);
             qp_attr.comp_mask = C::IBV_QP_INIT_ATTR_PD;
 
             let qp = create_resource(
@@ -190,28 +190,51 @@ impl Drop for Owner {
     }
 }
 
+#[repr(C)]
+pub struct QueuePairCapacity {
+    pub max_send_wr: u32,
+    pub max_recv_wr: u32,
+    pub max_send_sge: u32,
+    pub max_recv_sge: u32,
+    pub max_inline_data: u32,
+}
+
+// layout test
+const _: () = {
+    assert!(mem::size_of::<QueuePairCapacity>() == mem::size_of::<C::ibv_qp_cap>());
+    assert!(mem::align_of::<QueuePairCapacity>() == mem::align_of::<C::ibv_qp_cap>());
+    let cap = QueuePairCapacity {
+        max_send_wr: 0,
+        max_recv_wr: 0,
+        max_send_sge: 0,
+        max_recv_sge: 0,
+        max_inline_data: 0,
+    };
+    let _ = C::ibv_qp_cap {
+        max_send_wr: cap.max_send_wr,
+        max_recv_wr: cap.max_recv_wr,
+        max_send_sge: cap.max_send_sge,
+        max_recv_sge: cap.max_recv_sge,
+        max_inline_data: cap.max_inline_data,
+    };
+};
+
+impl Default for QueuePairCapacity {
+    #[inline]
+    fn default() -> Self {
+        // SAFETY: POD ffi type
+        unsafe { mem::zeroed() }
+    }
+}
+
+#[derive(Default)]
 pub struct QueuePairOptions {
     user_data: usize,
     send_cq: Option<Arc<cq::Owner>>,
     recv_cq: Option<Arc<cq::Owner>>,
     qp_type: Option<QueuePairType>,
     sq_sig_all: Option<bool>,
-    cap: C::ibv_qp_cap,
-}
-
-impl Default for QueuePairOptions {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            user_data: 0,
-            send_cq: None,
-            recv_cq: None,
-            qp_type: None,
-            sq_sig_all: None,
-            // SAFETY: POD ffi type
-            cap: unsafe { mem::zeroed() },
-        }
-    }
+    cap: QueuePairCapacity,
 }
 
 impl QueuePairOptions {
@@ -241,28 +264,8 @@ impl QueuePairOptions {
         self
     }
     #[inline]
-    pub fn max_send_wr(&mut self, max_send_wr: u32) -> &mut Self {
-        self.cap.max_send_wr = max_send_wr;
-        self
-    }
-    #[inline]
-    pub fn max_recv_wr(&mut self, max_recv_wr: u32) -> &mut Self {
-        self.cap.max_recv_wr = max_recv_wr;
-        self
-    }
-    #[inline]
-    pub fn max_send_sge(&mut self, max_send_sge: u32) -> &mut Self {
-        self.cap.max_send_sge = max_send_sge;
-        self
-    }
-    #[inline]
-    pub fn max_recv_sge(&mut self, max_recv_sge: u32) -> &mut Self {
-        self.cap.max_recv_sge = max_recv_sge;
-        self
-    }
-    #[inline]
-    pub fn max_inline_data(&mut self, max_inline_data: u32) -> &mut Self {
-        self.cap.max_inline_data = max_inline_data;
+    pub fn cap(&mut self, cap: QueuePairCapacity) -> &mut Self {
+        self.cap = cap;
         self
     }
 }
@@ -396,8 +399,11 @@ pub struct QueuePairAttr {
 impl QueuePairAttr {
     #[inline]
     #[must_use]
-    pub fn max_inline_data(&self) -> Option<u32> {
-        (self.mask & C::IBV_QP_CAP != 0).then(|| self.attr.cap.max_inline_data)
+    pub fn cap(&self) -> Option<&QueuePairCapacity> {
+        (self.mask & C::IBV_QP_CAP != 0).then(|| {
+            // SAFETY: same repr
+            unsafe { mem::transmute(&self.attr.cap) }
+        })
     }
 
     #[inline]
