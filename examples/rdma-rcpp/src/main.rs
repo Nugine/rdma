@@ -11,8 +11,9 @@ use rdma::qp::{QueuePairCapacity, QueuePairState, QueuePairType};
 use rdma::query::{Gid, GidEntry, LinkLayer, PortAttr};
 use rdma::wr;
 
-use std::mem::ManuallyDrop;
-use std::net::IpAddr;
+use std::io::{Read, Write};
+use std::mem::{self, ManuallyDrop};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 use std::{env, slice};
 
 use anyhow::{anyhow, Result};
@@ -50,6 +51,10 @@ struct Args {
     /// local port gid index
     #[clap(short = 'g', long, default_value = "0")]
     gid_idx: u32,
+
+    /// listen on/connect to port
+    #[clap(short = 'p', long, default_value = "18515")]
+    port: u16,
 }
 
 fn main() -> Result<()> {
@@ -80,12 +85,12 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Dest {
-    lid: u16,
-    gid: Gid,
     qpn: u32,
     psn: u32,
+    lid: u16,
+    gid: Gid,
 }
 
 struct PingPong {
@@ -223,7 +228,10 @@ impl PingPong {
         Ok(())
     }
 
-    fn self_dest(&self) -> Result<Dest> {
+    fn local_dest(&self) -> Result<Dest> {
+        let qpn = self.qp.qp_num();
+        let psn = 0x123456;
+
         let port_attr = PortAttr::query(&self.ctx, self.args.ib_port)?;
         let lid = port_attr.lid();
         if port_attr.link_layer() != LinkLayer::Ethernet && lid == 0 {
@@ -233,10 +241,58 @@ impl PingPong {
         let gid_entry = GidEntry::query(&self.ctx, self.args.ib_port.into(), self.args.gid_idx)?;
         let gid = gid_entry.gid();
 
-        let qpn = self.qp.qp_num();
+        Ok(Dest { qpn, psn, lid, gid })
+    }
 
-        let psn = 0x123456;
+    fn handshake(&mut self) -> Result<()> {
+        let local_dest = self.local_dest()?;
 
-        Ok(Dest { lid, gid, qpn, psn })
+        info!("local dest: {:?}", local_dest);
+
+        let mut msg_buf = bincode::serialize(&local_dest)?;
+        let mut msg_size = msg_buf.len().numeric_cast::<u64>().to_be_bytes();
+
+        let mut stream = match self.server {
+            Some(ip) => {
+                // client side
+                let server_addr = SocketAddr::from((ip, self.args.port));
+                info!("connecting to {}", server_addr);
+                TcpStream::connect(&server_addr)?
+            }
+            None => {
+                // server side
+                let server_addr = SocketAddr::from((Ipv6Addr::UNSPECIFIED, self.args.port));
+                let listener = TcpListener::bind(server_addr)?;
+                info!("listening on port {}", self.args.port);
+                let (stream, peer_addr) = listener.accept()?;
+                info!("accepted connection from {}", peer_addr);
+                stream
+            }
+        };
+
+        stream.write_all(&msg_size)?;
+        stream.write_all(&msg_buf)?;
+        stream.flush()?;
+
+        stream.read_exact(&mut msg_size)?;
+
+        let size: usize = u64::from_be_bytes(msg_size).numeric_cast();
+        assert!(size <= mem::size_of::<Dest>());
+
+        msg_buf.clear();
+        msg_buf.resize(size, 0);
+
+        stream.read_exact(&mut msg_buf)?;
+
+        let remote_dest: Dest = bincode::deserialize(&msg_buf)?;
+        info!("remote dest: {:?}", remote_dest);
+
+        {
+            let mut options = qp::ModifyOptions::default();
+
+            options.qp_state(QueuePairState::ReadyToReceive);
+        }
+
+        todo!()
     }
 }
