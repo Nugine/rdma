@@ -83,6 +83,20 @@ impl Gid {
     pub fn to_ipv6_addr(&self) -> Ipv6Addr {
         Ipv6Addr::from(*self.as_bytes())
     }
+
+    #[inline]
+    #[must_use]
+    pub fn subnet_prefix(&self) -> u64 {
+        // SAFETY: POD
+        unsafe { self.0.global.subnet_prefix }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn interface_id(&self) -> u64 {
+        // SAFETY: POD
+        unsafe { self.0.global.interface_id }
+    }
 }
 
 impl PartialEq for Gid {
