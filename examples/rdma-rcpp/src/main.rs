@@ -51,7 +51,7 @@ struct Args {
     ib_port: u8,
 
     /// local port gid index
-    #[clap(short = 'g', long, default_value = "0")]
+    #[clap(short = 'g', long, default_value = "2")]
     gid_idx: u32,
 
     /// listen on/connect to port
