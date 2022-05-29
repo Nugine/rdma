@@ -8,9 +8,11 @@ use rdma::device::{Device, DeviceList};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
 use rdma::qp::{self, QueuePair, QueuePairCapacity, QueuePairState, QueuePairType};
+use rdma::wr;
 
-use std::env;
-use std::net::{IpAddr, SocketAddr};
+use std::mem::ManuallyDrop;
+use std::net::IpAddr;
+use std::{env, slice};
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -62,86 +64,147 @@ fn main() -> Result<()> {
         None => info!("run server"),
     }
 
-    run(&args, server)
-}
+    let mut pp = PingPong::new(args, server)?;
 
-fn run(args: &Args, server: Option<IpAddr>) -> Result<()> {
-    let mut buf: Vec<u8> = {
-        assert_ne!(args.size, 0);
-        vec![0xcc; args.size]
-    };
+    unsafe { pp.post_recv(pp.args.rx_depth)? }
 
-    let ctx: _ = {
-        let dev_list = DeviceList::available()?;
-        let dev = choose_device(&dev_list, args.ib_dev.as_deref())?;
-        Context::open(dev)?
-    };
-
-    let cc = CompChannel::create(&ctx)?;
-
-    let pd = ProtectionDomain::alloc(&ctx)?;
-
-    let mr = unsafe {
-        let addr = buf.as_mut_ptr();
-        let length = buf.len();
-        let access_flags = AccessFlags::LOCAL_WRITE;
-        MemoryRegion::register(&pd, addr, length, access_flags)?
-    };
-
-    let cq = {
-        let mut options = CompletionQueue::options();
-        options.cqe(args.rx_depth.checked_add(1).unwrap());
-        options.channel(&cc);
-        CompletionQueue::create(&ctx, options)?
-    };
-
-    let qp = {
-        let mut options = QueuePair::options();
-        options
-            .send_cq(&cq)
-            .recv_cq(&cq)
-            .cap(QueuePairCapacity {
-                max_send_wr: 1,
-                max_recv_wr: args.rx_depth.numeric_cast(),
-                max_send_sge: 1,
-                max_recv_sge: 1,
-                max_inline_data: 0,
-            })
-            .qp_type(QueuePairType::RC);
-        QueuePair::create(&pd, options)?
-    };
-
-    let can_send_inline = {
-        let mut options = qp::QueryOptions::default();
-        options.cap();
-        let qp_attr = qp.query(options)?;
-        let cap = qp_attr.cap().unwrap();
-        cap.max_inline_data.numeric_cast::<usize>() >= args.rx_depth
-    };
-
-    {
-        let mut options = qp::ModifyOptions::default();
-        options
-            .qp_state(QueuePairState::Initialize)
-            .pkey_index(0)
-            .port_num(args.ib_port)
-            .qp_access_flags(AccessFlags::empty());
-        qp.modify(options)?;
-    }
+    pp.cq.req_notify_all()?;
 
     Ok(())
 }
 
-fn choose_device<'dl>(dev_list: &'dl DeviceList, name: Option<&str>) -> Result<&'dl Device> {
-    let dev = match name {
-        Some(name) => dev_list.iter().find(|d| d.name() == name),
-        None => dev_list.get(0),
-    };
-    if let Some(dev) = dev {
-        return Ok(dev);
+struct PingPong {
+    args: Args,
+    server: Option<IpAddr>,
+
+    mr: ManuallyDrop<MemoryRegion>,
+    qp: QueuePair,
+    cq: CompletionQueue,
+    pd: ProtectionDomain,
+    cc: CompChannel,
+    ctx: Context,
+
+    can_send_inline: bool,
+}
+
+impl Drop for PingPong {
+    fn drop(&mut self) {
+        // deregister the memory region firstly
+        unsafe { ManuallyDrop::drop(&mut self.mr) }
     }
-    if dev_list.is_empty() {
-        return Err(anyhow!("no available rdma devices"));
+}
+
+impl PingPong {
+    const RECV_WRID: u64 = 1 << 0;
+    const SEND_WRID: u64 = 1 << 1;
+
+    fn new(args: Args, server: Option<IpAddr>) -> Result<Self> {
+        let mut buf: Vec<u8> = {
+            assert_ne!(args.size, 0);
+            vec![0xcc; args.size]
+        };
+
+        let ctx: _ = {
+            let dev_list = DeviceList::available()?;
+            let dev = Self::choose_device(&dev_list, args.ib_dev.as_deref())?;
+            Context::open(dev)?
+        };
+
+        let cc = CompChannel::create(&ctx)?;
+
+        let pd = ProtectionDomain::alloc(&ctx)?;
+
+        let mr = unsafe {
+            let addr = buf.as_mut_ptr();
+            let length = buf.len();
+            let access_flags = AccessFlags::LOCAL_WRITE;
+            MemoryRegion::register(&pd, addr, length, access_flags)?
+        };
+
+        let cq = {
+            let mut options = CompletionQueue::options();
+            options.cqe(args.rx_depth.checked_add(1).unwrap());
+            options.channel(&cc);
+            CompletionQueue::create(&ctx, options)?
+        };
+
+        let qp = {
+            let mut options = QueuePair::options();
+            options
+                .send_cq(&cq)
+                .recv_cq(&cq)
+                .cap(QueuePairCapacity {
+                    max_send_wr: 1,
+                    max_recv_wr: args.rx_depth.numeric_cast(),
+                    max_send_sge: 1,
+                    max_recv_sge: 1,
+                    max_inline_data: 0,
+                })
+                .qp_type(QueuePairType::RC);
+            QueuePair::create(&pd, options)?
+        };
+
+        let can_send_inline = {
+            let mut options = qp::QueryOptions::default();
+            options.cap();
+            let qp_attr = qp.query(options)?;
+            let cap = qp_attr.cap().unwrap();
+            cap.max_inline_data.numeric_cast::<usize>() >= args.rx_depth
+        };
+
+        {
+            let mut options = qp::ModifyOptions::default();
+            options
+                .qp_state(QueuePairState::Initialize)
+                .pkey_index(0)
+                .port_num(args.ib_port)
+                .qp_access_flags(AccessFlags::empty());
+            qp.modify(options)?;
+        }
+
+        Ok(Self {
+            args,
+            server,
+            mr: ManuallyDrop::new(mr),
+            qp,
+            cq,
+            pd,
+            cc,
+            ctx,
+            can_send_inline,
+        })
     }
-    Err(anyhow!("can not find device with name: {}", name.unwrap()))
+
+    fn choose_device<'dl>(dev_list: &'dl DeviceList, name: Option<&str>) -> Result<&'dl Device> {
+        let dev = match name {
+            Some(name) => dev_list.iter().find(|d| d.name() == name),
+            None => dev_list.get(0),
+        };
+        if let Some(dev) = dev {
+            return Ok(dev);
+        }
+        if dev_list.is_empty() {
+            return Err(anyhow!("no available rdma devices"));
+        }
+        Err(anyhow!("can not find device with name: {}", name.unwrap()))
+    }
+
+    unsafe fn post_recv(&mut self, n: usize) -> Result<()> {
+        let mut sge = wr::Sge {
+            addr: self.mr.addr_u64(),
+            length: self.mr.length().numeric_cast(),
+            lkey: self.mr.lkey(),
+        };
+        let mut recv_wr = wr::RecvRequest::zeroed();
+
+        recv_wr
+            .id(Self::RECV_WRID)
+            .sg_list(slice::from_mut(&mut sge));
+
+        for _ in 0..n {
+            self.qp.post_recv(&mut recv_wr)?;
+        }
+
+        Ok(())
+    }
 }
