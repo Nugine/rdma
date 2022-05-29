@@ -9,11 +9,13 @@ use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
 use rdma::qp::{self, Mtu, QueuePair};
 use rdma::qp::{QueuePairCapacity, QueuePairState, QueuePairType};
+use rdma::wc::WorkCompletion;
 use rdma::wr;
 
 use std::io::{Read, Write};
-use std::mem::{self, ManuallyDrop};
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpListener, TcpStream};
+use std::time::Instant;
 use std::{env, slice};
 
 use anyhow::{anyhow, Context as _, Result};
@@ -55,6 +57,10 @@ struct Args {
     /// listen on/connect to port
     #[clap(short = 'p', long, default_value = "18515")]
     port: u16,
+
+    /// number of exchanges
+    #[clap(short = 'n', long, default_value = "1000")]
+    iters: usize,
 }
 
 fn main() -> Result<()> {
@@ -82,13 +88,78 @@ fn main() -> Result<()> {
 fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
     let mut pp = PingPong::new(args, server)?;
 
-    unsafe { pp.post_recv(pp.args.rx_depth)? }
+    unsafe { pp.post_recv(pp.args.rx_depth)? };
 
     pp.cq.req_notify_all()?;
 
     pp.handshake()?;
 
-    let mut pending = PingPong::RECV_WRID;
+    unsafe { pp.post_send()? };
+
+    let mut pending = PingPong::RECV_WRID | PingPong::SEND_WRID;
+    let mut recv_cnt = 0;
+    let mut send_cnt = 0;
+    let mut recv_wr_cnt = pp.args.rx_depth;
+    let mut num_cq_events = 0;
+    const UNINIT_WC: MaybeUninit<WorkCompletion> = MaybeUninit::uninit();
+    let mut wc_buf = [UNINIT_WC; 32];
+
+    let t0 = Instant::now();
+
+    while recv_cnt < pp.args.iters || send_cnt < pp.args.iters {
+        pp.cc.wait_cq_event()?;
+        num_cq_events += 1;
+
+        pp.cq.req_notify_all()?;
+
+        let wcs = pp.cq.poll(&mut wc_buf)?;
+        for wc in wcs {
+            wc.status()?;
+
+            match wc.wr_id() {
+                PingPong::SEND_WRID => {
+                    send_cnt += 1;
+                }
+                PingPong::RECV_WRID => {
+                    recv_wr_cnt -= 1;
+                    if recv_wr_cnt <= 1 {
+                        unsafe { pp.post_recv(pp.args.rx_depth)? }
+                        recv_wr_cnt += pp.args.rx_depth;
+                    }
+
+                    recv_cnt += 1;
+                }
+                _ => panic!("unknown wr id: {}", wc.wr_id()),
+            }
+
+            pending &= !wc.wr_id();
+            if send_cnt < pp.args.iters && pending == 0 {
+                unsafe { pp.post_send()? }
+                pending = PingPong::RECV_WRID | PingPong::SEND_WRID;
+            }
+        }
+    }
+
+    let t1 = Instant::now();
+
+    pp.cq.ack_cq_events(num_cq_events);
+
+    let time = (t1 - t0).as_secs_f64();
+    let bytes = pp.args.size * pp.args.iters * 2;
+    println!(
+        "{} bytes in {:.2} seconds = {:.2} Mbps",
+        bytes,
+        time,
+        (bytes * 8) as f64 / time
+    );
+    println!(
+        "{} iters in {:.2} seconds = {:.2} us/iter",
+        pp.args.iters,
+        time,
+        time * 1e6 / (pp.args.iters as f64)
+    );
+
+    drop(pp);
 
     Ok(())
 }
@@ -110,14 +181,12 @@ struct PingPong {
 
     qp: QueuePair,
     cq: CompletionQueue,
-    pd: ProtectionDomain,
+    _pd: ProtectionDomain,
     cc: CompChannel,
     ctx: Context,
 
-    send_buf: Vec<u8>,
-    recv_buf: Vec<u8>,
-
-    can_send_inline: bool,
+    _send_buf: Vec<u8>,
+    _recv_buf: Vec<u8>,
 }
 
 impl Drop for PingPong {
@@ -170,27 +239,21 @@ impl PingPong {
         };
 
         let qp = {
+            let cap = QueuePairCapacity {
+                max_send_wr: 1,
+                max_recv_wr: args.rx_depth.numeric_cast(),
+                max_send_sge: 1,
+                max_recv_sge: 1,
+                max_inline_data: 0,
+            };
             let mut options = QueuePair::options();
             options
                 .send_cq(&cq)
                 .recv_cq(&cq)
-                .cap(QueuePairCapacity {
-                    max_send_wr: 1,
-                    max_recv_wr: args.rx_depth.numeric_cast(),
-                    max_send_sge: 1,
-                    max_recv_sge: 1,
-                    max_inline_data: 0,
-                })
-                .qp_type(QueuePairType::RC);
+                .cap(cap)
+                .qp_type(QueuePairType::RC)
+                .sq_sig_all(true);
             QueuePair::create(&pd, options)?
-        };
-
-        let can_send_inline = {
-            let mut options = qp::QueryOptions::default();
-            options.cap();
-            let qp_attr = qp.query(options)?;
-            let cap = qp_attr.cap().unwrap();
-            cap.max_inline_data.numeric_cast::<usize>() >= args.rx_depth
         };
 
         {
@@ -210,12 +273,11 @@ impl PingPong {
             recv_mr: ManuallyDrop::new(recv_mr),
             qp,
             cq,
-            pd,
+            _pd: pd,
             cc,
             ctx,
-            send_buf,
-            recv_buf,
-            can_send_inline,
+            _send_buf: send_buf,
+            _recv_buf: recv_buf,
         })
     }
 
@@ -239,6 +301,7 @@ impl PingPong {
             length: self.recv_mr.length().numeric_cast(),
             lkey: self.recv_mr.lkey(),
         };
+
         let mut recv_wr = wr::RecvRequest::zeroed();
 
         recv_wr
@@ -248,6 +311,24 @@ impl PingPong {
         for _ in 0..n {
             self.qp.post_recv(&mut recv_wr)?;
         }
+
+        Ok(())
+    }
+
+    unsafe fn post_send(&mut self) -> Result<()> {
+        let mut sge = wr::Sge {
+            addr: self.send_mr.addr_u64(),
+            length: self.send_mr.length().numeric_cast(),
+            lkey: self.send_mr.lkey(),
+        };
+
+        let mut send_wr = wr::SendRequest::zeroed();
+
+        send_wr
+            .id(Self::SEND_WRID)
+            .sg_list(slice::from_mut(&mut sge));
+
+        self.qp.post_send(&mut send_wr)?;
 
         Ok(())
     }
@@ -321,7 +402,7 @@ impl PingPong {
 
     fn handshake(&mut self) -> Result<()> {
         let local_dest = self.local_dest()?;
-        info!("local dest: {:?}", local_dest);
+        info!("local dest:\n{:#?}", local_dest);
 
         let mut stream = match self.server {
             Some(ip) => {
@@ -364,7 +445,7 @@ impl PingPong {
         let mut msg_buf = Vec::new();
         send_dest(&mut stream, &mut msg_buf, &local_dest)?;
         let remote_dest = recv_dest(&mut stream, &mut msg_buf)?;
-        info!("remote dest: {:?}", remote_dest);
+        info!("remote dest:\n{:#?}", remote_dest);
 
         self.forward_qp(&local_dest, &remote_dest)?;
 
