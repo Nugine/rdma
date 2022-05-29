@@ -70,10 +70,10 @@ impl QueuePair {
 
     #[inline]
     #[must_use]
-    pub fn number(&self) -> QueuePairNumber {
+    pub fn qp_num(&self) -> u32 {
         let qp = self.ffi_ptr();
         // SAFETY: reading a immutable field of a concurrent ffi type
-        QueuePairNumber(unsafe { (*qp).qp_num })
+        unsafe { (*qp).qp_num }
     }
 
     #[inline]
@@ -287,24 +287,6 @@ impl QueuePairOptions {
     pub fn cap(&mut self, cap: QueuePairCapacity) -> &mut Self {
         self.attr.cap = cap.into_ctype();
         self
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct QueuePairNumber(u32);
-
-impl QueuePairNumber {
-    #[inline]
-    #[must_use]
-    pub fn new(raw_value: u32) -> QueuePairNumber {
-        Self(raw_value)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn raw_value(self) -> u32 {
-        self.0
     }
 }
 
