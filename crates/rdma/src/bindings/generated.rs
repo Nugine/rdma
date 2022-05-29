@@ -8,4 +8,13 @@
 
 use super::*;
 
+#[cfg(not(docsrs))]
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
+#[cfg(all(
+    docsrs,
+    target_arch = "x86_64",
+    target_os = "linux",
+    target_env = "gnu"
+))]
+include!("./x86_64_unknown_linux_gnu.rs");

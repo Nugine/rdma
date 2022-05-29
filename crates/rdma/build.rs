@@ -19,6 +19,10 @@ fn link_rdma_core(lib_name: &str, pkg_name: &str, version: &str, include_paths: 
 }
 
 fn main() {
+    if cfg!(docsrs) {
+        return;
+    }
+
     let mut include_paths: Vec<String> = Vec::new();
 
     {
