@@ -96,13 +96,11 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
 
     unsafe { pp.post_send()? };
 
-    let mut pending = PingPong::RECV_WRID | PingPong::SEND_WRID;
     let mut recv_cnt = 0;
     let mut send_cnt = 0;
     let mut recv_wr_cnt = pp.args.rx_depth;
-    let mut num_cq_events = 0;
     const UNINIT_WC: MaybeUninit<WorkCompletion> = MaybeUninit::uninit();
-    let mut wc_buf = [UNINIT_WC; 32];
+    let mut wc_buf = [UNINIT_WC; 64];
 
     info!("start iteration");
 
@@ -112,34 +110,36 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
         debug!(?recv_cnt, ?send_cnt);
 
         pp.cc.wait_cq_event()?;
-        num_cq_events += 1;
+        pp.cq.ack_cq_events(1);
 
         pp.cq.req_notify_all()?;
 
         let wcs = pp.cq.poll(&mut wc_buf)?;
+
+        debug!("poll {} wcs", wcs.len());
+
         for wc in wcs {
             wc.status()?;
 
             match wc.wr_id() {
                 PingPong::SEND_WRID => {
                     send_cnt += 1;
+                    debug!(?send_cnt);
+                    if send_cnt < pp.args.iters {
+                        unsafe { pp.post_send()? }
+                    }
                 }
                 PingPong::RECV_WRID => {
+                    recv_cnt += 1;
+                    debug!(?recv_cnt);
+
                     recv_wr_cnt -= 1;
                     if recv_wr_cnt <= 1 {
                         unsafe { pp.post_recv(pp.args.rx_depth)? }
                         recv_wr_cnt += pp.args.rx_depth;
                     }
-
-                    recv_cnt += 1;
                 }
                 _ => panic!("unknown wr id: {}", wc.wr_id()),
-            }
-
-            pending &= !wc.wr_id();
-            if send_cnt < pp.args.iters && pending == 0 {
-                unsafe { pp.post_send()? }
-                pending = PingPong::RECV_WRID | PingPong::SEND_WRID;
             }
         }
     }
@@ -147,8 +147,6 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
     let t1 = Instant::now();
 
     info!("end iteration");
-
-    pp.cq.ack_cq_events(num_cq_events);
 
     let time = (t1 - t0).as_secs_f64();
     let bytes = pp.args.size * pp.args.iters * 2;
