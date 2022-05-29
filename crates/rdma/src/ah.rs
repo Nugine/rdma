@@ -103,6 +103,7 @@ impl AddressHandleOptions {
 
     #[inline]
     pub fn global_route_header(&mut self, global_route_header: GlobalRoute) -> &mut Self {
+        self.attr.is_global = 1;
         self.attr.grh = global_route_header.into_ctype();
         self
     }
