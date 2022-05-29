@@ -2,7 +2,7 @@ use crate::bindings as C;
 use crate::error::create_resource;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
-use crate::utils::{c_uint_to_u32, u32_as_c_uint};
+use crate::utils::{c_uint_to_u32, ptr_to_addr, u32_as_c_uint};
 
 use std::io;
 use std::os::raw::{c_uint, c_void};
@@ -10,6 +10,7 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 
 use bitflags::bitflags;
+use numeric_cast::NumericCast;
 
 pub struct MemoryRegion(Arc<Owner>);
 
@@ -73,10 +74,18 @@ impl MemoryRegion {
 
     #[inline]
     #[must_use]
-    pub fn addr(&self) -> *mut u8 {
+    pub fn addr_ptr(&self) -> *mut u8 {
         let mr = self.ffi_ptr();
         // SAFETY: reading a immutable field of a concurrent ffi type
         unsafe { (*mr).addr.cast() }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn addr_u64(&self) -> u64 {
+        let mr = self.ffi_ptr();
+        // SAFETY: reading a immutable field of a concurrent ffi type
+        unsafe { ptr_to_addr((*mr).addr) }.numeric_cast()
     }
 
     #[inline]
