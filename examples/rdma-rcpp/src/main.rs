@@ -22,7 +22,7 @@ use anyhow::{anyhow, Context as _, Result};
 use clap::Parser;
 use numeric_cast::NumericCast;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{debug, info};
 
 #[derive(Debug, clap::Parser)]
 struct Opt {
@@ -104,9 +104,13 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
     const UNINIT_WC: MaybeUninit<WorkCompletion> = MaybeUninit::uninit();
     let mut wc_buf = [UNINIT_WC; 32];
 
+    info!("start iteration");
+
     let t0 = Instant::now();
 
     while recv_cnt < pp.args.iters || send_cnt < pp.args.iters {
+        debug!(?recv_cnt, ?send_cnt);
+
         pp.cc.wait_cq_event()?;
         num_cq_events += 1;
 
@@ -141,6 +145,8 @@ fn run(args: Args, server: Option<IpAddr>) -> Result<()> {
     }
 
     let t1 = Instant::now();
+
+    info!("end iteration");
 
     pp.cq.ack_cq_events(num_cq_events);
 
@@ -211,6 +217,7 @@ impl PingPong {
         let ctx: _ = {
             let dev_list = DeviceList::available()?;
             let dev = Self::choose_device(&dev_list, args.ib_dev.as_deref())?;
+            info!("device name: {}", dev.name());
             Context::open(dev)?
         };
 
