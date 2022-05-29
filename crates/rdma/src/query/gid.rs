@@ -130,6 +130,34 @@ fn gid_to_hex<R>(gid: &Gid, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -> R
     f(ans)
 }
 
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use super::Gid;
+
+    use serde::{Deserialize, Serialize};
+
+    impl Serialize for Gid {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            // FIXME: bytes format or struct format?
+            <[u8; 16] as Serialize>::serialize(self.as_bytes(), serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Gid {
+        #[inline]
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            <[u8; 16] as Deserialize<'de>>::deserialize(deserializer).map(Self::from_bytes)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

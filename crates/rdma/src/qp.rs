@@ -291,9 +291,16 @@ impl QueuePairOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QueuePairNumber(u32);
 
 impl QueuePairNumber {
+    #[inline]
+    #[must_use]
+    pub fn new(raw_value: u32) -> QueuePairNumber {
+        Self(raw_value)
+    }
+
     #[inline]
     #[must_use]
     pub fn raw_value(self) -> u32 {
