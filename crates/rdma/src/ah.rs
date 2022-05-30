@@ -13,6 +13,10 @@ use std::sync::Arc;
 pub struct AddressHandle(Arc<Owner>);
 
 impl AddressHandle {
+    pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_ah {
+        self.0.ffi_ptr()
+    }
+
     #[inline]
     #[must_use]
     pub fn options() -> AddressHandleOptions {

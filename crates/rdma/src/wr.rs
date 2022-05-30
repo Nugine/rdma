@@ -1,3 +1,4 @@
+use crate::ah::AddressHandle;
 use crate::bindings as C;
 use crate::utils::{c_uint_to_u32, u32_as_c_uint};
 
@@ -71,6 +72,24 @@ impl SendRequest {
     #[inline]
     pub fn opcode(&mut self, opcode: Opcode) -> &mut Self {
         self.0.opcode = opcode.to_c_uint();
+        self
+    }
+
+    #[inline]
+    pub fn ud_ah(&mut self, ah: &AddressHandle) -> &mut Self {
+        self.0.wr.ud.ah = ah.ffi_ptr();
+        self
+    }
+
+    #[inline]
+    pub fn ud_remote_qpn(&mut self, remote_qpn: u32) -> &mut Self {
+        self.0.wr.ud.remote_qpn = remote_qpn;
+        self
+    }
+
+    #[inline]
+    pub fn ud_remote_qkey(&mut self, remote_qkey: u32) -> &mut Self {
+        self.0.wr.ud.remote_qkey = remote_qkey;
         self
     }
 }
