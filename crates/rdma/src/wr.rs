@@ -5,6 +5,7 @@ use crate::utils::{c_uint_to_u32, ptr_as_mut, u32_as_c_uint};
 use std::mem;
 use std::os::raw::{c_int, c_uint};
 
+use bitflags::bitflags;
 use numeric_cast::NumericCast;
 
 #[repr(transparent)]
@@ -76,6 +77,12 @@ impl SendRequest {
     }
 
     #[inline]
+    pub fn send_flags(&mut self, send_flags: SendFlags) -> &mut Self {
+        self.0.send_flags = u32_as_c_uint(send_flags.bits());
+        self
+    }
+
+    #[inline]
     pub fn ud_ah(&mut self, ah: &AddressHandle) -> &mut Self {
         self.0.wr.ud.ah = ah.ffi_ptr();
         self
@@ -138,6 +145,16 @@ impl Opcode {
     fn to_c_uint(self) -> c_uint {
         #[allow(clippy::as_conversions)]
         u32_as_c_uint(self as u32)
+    }
+}
+
+bitflags! {
+    pub struct SendFlags: u32 {
+        const FENCE = c_uint_to_u32(C::IBV_SEND_FENCE);
+        const SIGNALED = c_uint_to_u32(C::IBV_SEND_SIGNALED);
+        const SOLICITED = c_uint_to_u32(C::IBV_SEND_SOLICITED);
+        const INLINE = c_uint_to_u32(C::IBV_SEND_INLINE);
+        const IP_CSUM = c_uint_to_u32(C::IBV_SEND_IP_CSUM);
     }
 }
 
