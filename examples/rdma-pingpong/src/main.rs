@@ -156,13 +156,13 @@ fn run(args: Args) -> Result<()> {
 
     let pd = ProtectionDomain::alloc(&ctx)?;
 
-    let mut send_mr = unsafe {
+    let send_mr = unsafe {
         let addr = send_buf.as_mut_ptr();
         let length = send_buf.len();
         let access_flags = AccessFlags::LOCAL_WRITE;
         MemoryRegion::register(&pd, addr, length, access_flags)?
     };
-    let mut recv_mr = unsafe {
+    let recv_mr = unsafe {
         let addr = recv_buf.as_mut_ptr();
         let length = recv_buf.len();
         let access_flags = AccessFlags::LOCAL_WRITE;
@@ -222,6 +222,53 @@ fn run(args: Args) -> Result<()> {
         }
     }
 
+    let mut recv_sge;
+    let mut recv_wr;
+    let mut send_sge;
+    let mut send_wr;
+
+    {
+        recv_sge = wr::Sge {
+            addr: recv_mr.addr_u64(),
+            length: recv_mr.length().numeric_cast(),
+            lkey: recv_mr.lkey(),
+        };
+
+        recv_wr = wr::RecvRequest::zeroed();
+        recv_wr
+            .id(RECV_WRID)
+            .sg_list(slice::from_mut(&mut recv_sge));
+    }
+
+    {
+        send_sge = wr::Sge {
+            addr: match args.qp_type {
+                QueuePairType::RC => send_mr.addr_u64(),
+                QueuePairType::UD => send_mr.addr_u64().wrapping_add(40),
+                _ => unimplemented!(),
+            },
+            length: args.size.numeric_cast(),
+            lkey: send_mr.lkey(),
+        };
+
+        send_wr = wr::SendRequest::zeroed();
+        send_wr
+            .id(SEND_WRID)
+            .sg_list(slice::from_mut(&mut send_sge))
+            .opcode(wr::Opcode::Send);
+
+        match args.qp_type {
+            QueuePairType::RC => {}
+            QueuePairType::UD => {
+                send_wr
+                    .ud_ah(ah.as_ref().unwrap())
+                    .ud_remote_qpn(remote_dest.qpn)
+                    .ud_remote_qkey(UD_QKEY);
+            }
+            _ => unimplemented!(),
+        }
+    }
+
     let time_sec = {
         let mut recv_comp_cnt = 0;
         let mut send_comp_cnt = 0;
@@ -239,11 +286,13 @@ fn run(args: Args) -> Result<()> {
 
             loop {
                 if recv_req_cnt <= 1 {
-                    unsafe { rc_post_recv(&qp, &mut recv_mr, args.rx_depth)? };
+                    for _ in 0..args.rx_depth {
+                        unsafe { qp.post_recv(&mut recv_wr)? };
+                    }
                     recv_req_cnt += args.rx_depth;
                 }
                 if send_req_cnt < 1 && send_comp_cnt < args.iters {
-                    unsafe { rc_post_send(&qp, &mut send_mr)? };
+                    unsafe { qp.post_send(&mut send_wr)? };
                     send_req_cnt += 1;
                 }
 
@@ -473,42 +522,6 @@ fn ud_activate(
         let ah = AddressHandle::create(pd, options)?;
         Ok(ah)
     }
-}
-
-unsafe fn rc_post_recv(qp: &QueuePair, recv_mr: &mut MemoryRegion, n: usize) -> Result<()> {
-    let mut sge = wr::Sge {
-        addr: recv_mr.addr_u64(),
-        length: recv_mr.length().numeric_cast(),
-        lkey: recv_mr.lkey(),
-    };
-
-    let mut recv_wr = wr::RecvRequest::zeroed();
-    recv_wr.id(RECV_WRID).sg_list(slice::from_mut(&mut sge));
-
-    for _ in 0..n {
-        qp.post_recv(&mut recv_wr)?;
-    }
-
-    Ok(())
-}
-
-unsafe fn rc_post_send(qp: &QueuePair, send_mr: &mut MemoryRegion) -> Result<()> {
-    let mut sge = wr::Sge {
-        addr: send_mr.addr_u64(),
-        length: send_mr.length().numeric_cast(),
-        lkey: send_mr.lkey(),
-    };
-
-    let mut send_wr = wr::SendRequest::zeroed();
-
-    send_wr
-        .id(SEND_WRID)
-        .sg_list(slice::from_mut(&mut sge))
-        .opcode(wr::Opcode::Send);
-
-    qp.post_send(&mut send_wr)?;
-
-    Ok(())
 }
 
 fn print_statistics(time_sec: f64, bytes: usize, iters: usize) {
