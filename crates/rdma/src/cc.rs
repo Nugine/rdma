@@ -99,8 +99,8 @@ impl Owner {
         self.cq_ref.lock().insert(cq);
     }
 
-    pub(crate) fn del_cq_ref(&self, cq: &cq::Owner) {
-        self.cq_ref.lock().remove(cq);
+    pub(crate) fn del_cq_ref(&self, cq: &cq::Owner) -> bool {
+        self.cq_ref.lock().remove(cq)
     }
 }
 

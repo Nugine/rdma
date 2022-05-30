@@ -171,7 +171,7 @@ impl Owner {
 impl Drop for Owner {
     fn drop(&mut self) {
         if let Some(ref cc) = self.cc {
-            cc.del_cq_ref(self);
+            assert!(cc.del_cq_ref(self));
         }
 
         // SAFETY: ffi
