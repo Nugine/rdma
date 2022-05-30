@@ -23,7 +23,7 @@ use anyhow::{anyhow, ensure, Context as _, Result};
 use clap::Parser;
 use numeric_cast::NumericCast;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{info, trace};
 
 #[derive(Debug, clap::Parser)]
 struct Args {
@@ -106,7 +106,7 @@ const UNINIT_WC: MaybeUninit<WorkCompletion> = MaybeUninit::uninit();
 fn run(args: Args) -> Result<()> {
     ensure!(args.size > 0);
 
-    let msg_size = args.size.numeric_cast::<u32>();
+    // let msg_size = args.size.numeric_cast::<u32>();
     let buf_size = match args.qp_type {
         QueuePairType::RC => args.size,
         QueuePairType::UD => args.size.checked_add(40).unwrap(),
@@ -181,9 +181,6 @@ fn run(args: Args) -> Result<()> {
 
     initialize(&qp, &args)?;
 
-    unsafe { rc_post_recv(&qp, &mut recv_mr, args.rx_depth)? };
-    cq.req_notify_all()?;
-
     {
         let local_dest = local_dest(&ctx, &qp, args.ib_port, args.gid_idx)?;
         info!("local dest:\n{:#?}", local_dest);
@@ -194,12 +191,11 @@ fn run(args: Args) -> Result<()> {
         rc_activate(&qp, &local_dest, &remote_dest, &args)?;
     }
 
-    unsafe { rc_post_send(&qp, &mut send_mr)? };
-
     let time_sec = {
-        let mut recv_cnt = 0;
-        let mut send_cnt = 0;
-        let mut recv_wr_cnt = args.rx_depth;
+        let mut recv_comp_cnt = 0;
+        let mut send_comp_cnt = 0;
+        let mut recv_req_cnt = 0;
+        let mut send_req_cnt = 0;
 
         let mut wc_buf = [UNINIT_WC; 2];
 
@@ -207,35 +203,50 @@ fn run(args: Args) -> Result<()> {
 
         let t0 = Instant::now();
 
-        while recv_cnt < args.iters || send_cnt < args.iters {
-            cc.wait_cq_event()?;
-            cq.ack_cq_events(1);
-
+        loop {
             cq.req_notify_all()?;
 
-            let wcs = cq.poll(&mut wc_buf)?;
+            loop {
+                if recv_req_cnt <= 1 {
+                    unsafe { rc_post_recv(&qp, &mut recv_mr, args.rx_depth)? };
+                    recv_req_cnt += args.rx_depth;
+                }
+                if send_req_cnt < 1 && send_comp_cnt < args.iters {
+                    unsafe { rc_post_send(&qp, &mut send_mr)? };
+                    send_req_cnt += 1;
+                }
 
-            for wc in wcs {
-                wc.status()?;
+                let wcs = cq.poll(&mut wc_buf)?;
 
-                match wc.wr_id() {
-                    SEND_WRID => {
-                        send_cnt += 1;
-                        if send_cnt < args.iters {
-                            unsafe { rc_post_send(&qp, &mut send_mr)? }
+                for wc in &mut *wcs {
+                    wc.status()?;
+
+                    match wc.wr_id() {
+                        SEND_WRID => {
+                            send_comp_cnt += 1;
+                            send_req_cnt -= 1;
                         }
-                    }
-                    RECV_WRID => {
-                        recv_cnt += 1;
-                        recv_wr_cnt -= 1;
-                        if recv_wr_cnt <= 1 {
-                            unsafe { rc_post_recv(&qp, &mut recv_mr, args.rx_depth)? }
-                            recv_wr_cnt += args.rx_depth;
+                        RECV_WRID => {
+                            recv_comp_cnt += 1;
+                            recv_req_cnt -= 1;
                         }
+                        _ => panic!("unknown wr id: {}", wc.wr_id()),
                     }
-                    _ => panic!("unknown wr id: {}", wc.wr_id()),
+                }
+
+                if wcs.is_empty() {
+                    break;
                 }
             }
+
+            trace!(?send_comp_cnt, ?recv_comp_cnt, ?send_req_cnt, ?recv_req_cnt);
+
+            if recv_comp_cnt >= args.iters && send_comp_cnt >= args.iters {
+                break;
+            }
+
+            cc.wait_cq_event()?;
+            cq.ack_cq_events(1);
         }
 
         let t1 = Instant::now();
