@@ -436,3 +436,34 @@ pub unsafe fn ibv_wr_abort(qp: *mut ibv_qp_ex) {
     let op: _ = (*qp).wr_abort.unwrap_unchecked();
     (op)(qp);
 }
+
+#[inline]
+pub unsafe fn ibv_create_srq_ex(
+    context: *mut ibv_context,
+    srq_init_attr_ex: *mut ibv_srq_init_attr_ex,
+) -> *mut ibv_srq {
+    let legacy = {
+        let mask: u32 = (*srq_init_attr_ex).comp_mask;
+
+        let has = |m: u32| (mask & m) != 0;
+        let contained_by = |m: u32| (mask & !m) == 0;
+
+        contained_by(IBV_SRQ_INIT_ATTR_PD | IBV_SRQ_INIT_ATTR_TYPE)
+            && has(IBV_SRQ_INIT_ATTR_PD)
+            && (has(IBV_SRQ_INIT_ATTR_TYPE).not()
+                || ((*srq_init_attr_ex).srq_type == IBV_SRQT_BASIC))
+    };
+
+    if legacy {
+        return ibv_create_srq((*srq_init_attr_ex).pd, srq_init_attr_ex.cast());
+    }
+
+    let vctx = verbs_get_ctx_op!(context, create_srq_ex);
+    if vctx.is_null() {
+        set_errno(EOPNOTSUPP);
+        return ptr::null_mut();
+    }
+
+    let op: _ = (*vctx).create_srq_ex.unwrap_unchecked();
+    (op)(context, srq_init_attr_ex)
+}
