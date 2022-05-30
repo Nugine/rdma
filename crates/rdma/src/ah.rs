@@ -9,6 +9,7 @@ use std::mem;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct AddressHandle(Arc<Owner>);
 
 impl AddressHandle {
@@ -64,6 +65,7 @@ impl Drop for Owner {
     }
 }
 
+#[derive(Clone)]
 pub struct AddressHandleOptions {
     attr: C::ibv_ah_attr,
 }
