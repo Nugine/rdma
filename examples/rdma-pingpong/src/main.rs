@@ -215,32 +215,21 @@ fn run(args: Args) -> Result<()> {
         _ => unimplemented!(),
     };
 
-    {
-        match args.qp_type {
-            QueuePairType::RC => {}
-            _ => todo!(),
-        }
-    }
-
-    let mut recv_sge;
-    let mut recv_wr;
-    let mut send_sge;
-    let mut send_wr;
-
-    {
+    let recv_sge;
+    let recv_wr = {
         recv_sge = wr::Sge {
             addr: recv_mr.addr_u64(),
             length: recv_mr.length().numeric_cast(),
             lkey: recv_mr.lkey(),
         };
 
-        recv_wr = wr::RecvRequest::zeroed();
-        recv_wr
-            .id(RECV_WRID)
-            .sg_list(slice::from_mut(&mut recv_sge));
-    }
+        let mut wr = wr::RecvRequest::zeroed();
+        wr.id(RECV_WRID).sg_list(slice::from_ref(&recv_sge));
+        wr
+    };
 
-    {
+    let send_sge;
+    let send_wr = {
         send_sge = wr::Sge {
             addr: match args.qp_type {
                 QueuePairType::RC => send_mr.addr_u64(),
@@ -251,23 +240,23 @@ fn run(args: Args) -> Result<()> {
             lkey: send_mr.lkey(),
         };
 
-        send_wr = wr::SendRequest::zeroed();
-        send_wr
-            .id(SEND_WRID)
-            .sg_list(slice::from_mut(&mut send_sge))
+        let mut wr = wr::SendRequest::zeroed();
+        wr.id(SEND_WRID)
+            .sg_list(slice::from_ref(&send_sge))
             .opcode(wr::Opcode::Send);
 
         match args.qp_type {
             QueuePairType::RC => {}
             QueuePairType::UD => {
-                send_wr
-                    .ud_ah(ah.as_ref().unwrap())
+                wr.ud_ah(ah.as_ref().unwrap())
                     .ud_remote_qpn(remote_dest.qpn)
                     .ud_remote_qkey(UD_QKEY);
             }
             _ => unimplemented!(),
         }
-    }
+
+        wr
+    };
 
     let time_sec = {
         let mut recv_comp_cnt = 0;
@@ -287,12 +276,12 @@ fn run(args: Args) -> Result<()> {
             loop {
                 if recv_req_cnt <= 1 {
                     for _ in 0..args.rx_depth {
-                        unsafe { qp.post_recv(&mut recv_wr)? };
+                        unsafe { qp.post_recv(&recv_wr)? };
                     }
                     recv_req_cnt += args.rx_depth;
                 }
                 if send_req_cnt < 1 && send_comp_cnt < args.iters {
-                    unsafe { qp.post_send(&mut send_wr)? };
+                    unsafe { qp.post_send(&send_wr)? };
                     send_req_cnt += 1;
                 }
 

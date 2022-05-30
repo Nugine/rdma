@@ -1,6 +1,6 @@
 use crate::ah::AddressHandle;
 use crate::bindings as C;
-use crate::utils::{c_uint_to_u32, u32_as_c_uint};
+use crate::utils::{c_uint_to_u32, ptr_as_mut, u32_as_c_uint};
 
 use std::mem;
 use std::os::raw::{c_int, c_uint};
@@ -63,9 +63,9 @@ impl SendRequest {
     }
 
     #[inline]
-    pub fn sg_list(&mut self, sg_list: &mut [Sge]) -> &mut Self {
+    pub fn sg_list(&mut self, sg_list: &[Sge]) -> &mut Self {
         self.0.num_sge = sg_list.len().numeric_cast::<c_int>();
-        self.0.sg_list = sg_list.as_mut_ptr().cast::<C::ibv_sge>();
+        self.0.sg_list = ptr_as_mut(sg_list.as_ptr()).cast::<C::ibv_sge>();
         self
     }
 
@@ -116,9 +116,9 @@ impl RecvRequest {
     }
 
     #[inline]
-    pub fn sg_list(&mut self, sg_list: &mut [Sge]) -> &mut Self {
+    pub fn sg_list(&mut self, sg_list: &[Sge]) -> &mut Self {
         self.0.num_sge = sg_list.len().numeric_cast::<c_int>();
-        self.0.sg_list = sg_list.as_mut_ptr().cast::<C::ibv_sge>();
+        self.0.sg_list = ptr_as_mut(sg_list.as_ptr()).cast::<C::ibv_sge>();
         self
     }
 }

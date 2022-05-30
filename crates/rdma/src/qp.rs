@@ -7,7 +7,7 @@ use crate::mr::AccessFlags;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
 use crate::srq::SharedReceiveQueue;
-use crate::utils::{bool_to_c_int, c_uint_to_u32, u32_as_c_uint};
+use crate::utils::{bool_to_c_int, c_uint_to_u32, ptr_as_mut, u32_as_c_uint};
 use crate::utils::{usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
 use crate::{bindings as C, srq};
@@ -82,9 +82,9 @@ impl QueuePair {
     /// # Safety
     /// TODO
     #[inline]
-    pub unsafe fn post_send(&self, send_wr: &mut SendRequest) -> io::Result<()> {
+    pub unsafe fn post_send(&self, send_wr: &SendRequest) -> io::Result<()> {
         let qp = self.ffi_ptr();
-        let wr: *mut C::ibv_send_wr = <*mut SendRequest>::cast(send_wr);
+        let wr: *mut C::ibv_send_wr = ptr_as_mut(send_wr).cast();
         let mut bad_wr: *mut C::ibv_send_wr = ptr::null_mut();
         set_errno(0);
         let ret = C::ibv_post_send(qp, wr, &mut bad_wr);
@@ -101,9 +101,9 @@ impl QueuePair {
     /// # Safety
     /// TODO
     #[inline]
-    pub unsafe fn post_recv(&self, recv_wr: &mut RecvRequest) -> io::Result<()> {
+    pub unsafe fn post_recv(&self, recv_wr: &RecvRequest) -> io::Result<()> {
         let qp = self.ffi_ptr();
-        let wr: *mut C::ibv_recv_wr = <*mut RecvRequest>::cast(recv_wr);
+        let wr: *mut C::ibv_recv_wr = ptr_as_mut(recv_wr).cast();
         let mut bad_wr: *mut C::ibv_recv_wr = ptr::null_mut();
         set_errno(0);
         let ret = C::ibv_post_recv(qp, wr, &mut bad_wr);
