@@ -1,6 +1,7 @@
 use crate::ah::AddressHandleOptions;
 use crate::cq::{self, CompletionQueue};
 use crate::ctx::Context;
+use crate::device::Mtu;
 use crate::error::{create_resource, from_errno};
 use crate::mr::AccessFlags;
 use crate::pd::{self, ProtectionDomain};
@@ -463,22 +464,6 @@ impl QueuePairState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum Mtu {
-    Mtu256 = c_uint_to_u32(C::IBV_MTU_256),
-    Mtu512 = c_uint_to_u32(C::IBV_MTU_512),
-    Mtu1024 = c_uint_to_u32(C::IBV_MTU_1024),
-    Mtu2048 = c_uint_to_u32(C::IBV_MTU_2048),
-    Mtu4096 = c_uint_to_u32(C::IBV_MTU_4096),
-}
-
-impl Mtu {
-    fn to_c_uint(self) -> c_uint {
-        #[allow(clippy::as_conversions)]
-        u32_as_c_uint(self as u32)
-    }
-}
 #[cfg(test)]
 mod tests {
     use super::*;
