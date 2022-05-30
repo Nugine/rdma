@@ -1,13 +1,15 @@
 use crate::ah::AddressHandleOptions;
-use crate::bindings as C;
 use crate::cq::{self, CompletionQueue};
+use crate::ctx::Context;
 use crate::error::{create_resource, from_errno};
 use crate::mr::AccessFlags;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
+use crate::srq::SharedReceiveQueue;
 use crate::utils::{bool_to_c_int, c_uint_to_u32, u32_as_c_uint};
 use crate::utils::{usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
+use crate::{bindings as C, srq};
 
 use std::mem::MaybeUninit;
 use std::os::raw::{c_int, c_uint};
@@ -38,21 +40,12 @@ impl QueuePair {
         QueuePairOptions::default()
     }
 
-    /// # Panics
-    /// 1. if the option `qp_type` is not set
-    /// 2. if the option `sq_sig_all` is not set
     #[inline]
-    pub fn create(pd: &ProtectionDomain, mut options: QueuePairOptions) -> io::Result<Self> {
-        assert!(options.has_qp_type, "qp_type is required");
-        assert!(options.has_sq_sig_all, "sq_sig_all is required");
+    pub fn create(ctx: &Context, mut options: QueuePairOptions) -> io::Result<Self> {
         // SAFETY: ffi
         let owner = unsafe {
-            let context = (*pd.ffi_ptr()).context;
-
+            let context = ctx.ffi_ptr();
             let qp_attr = &mut options.attr;
-
-            qp_attr.pd = pd.ffi_ptr();
-            qp_attr.comp_mask = C::IBV_QP_INIT_ATTR_PD;
 
             let qp = create_resource(
                 || C::ibv_create_qp_ex(context, qp_attr),
@@ -61,7 +54,7 @@ impl QueuePair {
 
             Arc::new(Owner {
                 qp,
-                _pd: pd.strong_ref(),
+                _pd: options.pd,
                 _send_cq: options.send_cq,
                 _recv_cq: options.recv_cq,
             })
@@ -149,7 +142,7 @@ impl QueuePair {
 pub(crate) struct Owner {
     qp: NonNull<C::ibv_qp>,
 
-    _pd: Arc<pd::Owner>,
+    _pd: Option<Arc<pd::Owner>>,
     _send_cq: Option<Arc<cq::Owner>>,
     _recv_cq: Option<Arc<cq::Owner>>,
 }
@@ -208,11 +201,10 @@ impl QueuePairCapacity {
 pub struct QueuePairOptions {
     attr: C::ibv_qp_init_attr_ex,
 
-    has_qp_type: bool,
-    has_sq_sig_all: bool,
-
     send_cq: Option<Arc<cq::Owner>>,
     recv_cq: Option<Arc<cq::Owner>>,
+    pd: Option<Arc<pd::Owner>>,
+    srq: Option<Arc<srq::Owner>>,
 }
 
 // SAFETY: owned type
@@ -226,10 +218,10 @@ impl Default for QueuePairOptions {
         Self {
             // SAFETY: POD ffi type
             attr: unsafe { mem::zeroed() },
-            has_qp_type: false,
-            has_sq_sig_all: false,
             send_cq: None,
             recv_cq: None,
+            pd: None,
+            srq: None,
         }
     }
 }
@@ -240,33 +232,57 @@ impl QueuePairOptions {
         self.attr.qp_context = usize_to_void_ptr(user_data);
         self
     }
+
     #[inline]
     pub fn send_cq(&mut self, send_cq: &CompletionQueue) -> &mut Self {
         self.attr.send_cq = C::ibv_cq_ex_to_cq(send_cq.ffi_ptr());
         self.send_cq = Some(send_cq.strong_ref());
         self
     }
+
     #[inline]
     pub fn recv_cq(&mut self, recv_cq: &CompletionQueue) -> &mut Self {
+        if self.srq.take().is_some() {
+            self.attr.srq = ptr::null_mut();
+        }
         self.attr.recv_cq = C::ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
         self.recv_cq = Some(recv_cq.strong_ref());
         self
     }
+
     #[inline]
     pub fn qp_type(&mut self, qp_type: QueuePairType) -> &mut Self {
         self.attr.qp_type = qp_type.to_c_uint();
-        self.has_qp_type = true;
         self
     }
+
     #[inline]
     pub fn sq_sig_all(&mut self, sq_sig_all: bool) -> &mut Self {
         self.attr.sq_sig_all = bool_to_c_int(sq_sig_all);
-        self.has_sq_sig_all = true;
         self
     }
+
     #[inline]
     pub fn cap(&mut self, cap: QueuePairCapacity) -> &mut Self {
         self.attr.cap = cap.into_ctype();
+        self
+    }
+
+    #[inline]
+    pub fn pd(&mut self, pd: &ProtectionDomain) -> &mut Self {
+        self.attr.pd = pd.ffi_ptr();
+        self.attr.comp_mask |= C::IBV_QP_INIT_ATTR_PD;
+        self.pd = Some(pd.strong_ref());
+        self
+    }
+
+    #[inline]
+    pub fn srq(&mut self, srq: &SharedReceiveQueue) -> &mut Self {
+        if self.recv_cq.take().is_some() {
+            self.attr.recv_cq = ptr::null_mut();
+        }
+        self.attr.srq = srq.ffi_ptr();
+        self.srq = Some(srq.strong_ref());
         self
     }
 }

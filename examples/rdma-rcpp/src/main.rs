@@ -251,8 +251,9 @@ impl PingPong {
                 .recv_cq(&cq)
                 .cap(cap)
                 .qp_type(QueuePairType::RC)
-                .sq_sig_all(true);
-            QueuePair::create(&pd, options)?
+                .sq_sig_all(true)
+                .pd(&pd);
+            QueuePair::create(&ctx, options)?
         };
 
         {
