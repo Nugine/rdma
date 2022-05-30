@@ -101,12 +101,13 @@ struct Dest {
 
 const RECV_WRID: u64 = 1;
 const SEND_WRID: u64 = 2;
+const UD_QKEY: u32 = 0x11111111;
+
 const UNINIT_WC: MaybeUninit<WorkCompletion> = MaybeUninit::uninit();
 
 fn run(args: Args) -> Result<()> {
     ensure!(args.size > 0);
 
-    // let msg_size = args.size.numeric_cast::<u32>();
     let buf_size = match args.qp_type {
         QueuePairType::RC => args.size,
         QueuePairType::UD => args.size.checked_add(40).unwrap(),
@@ -134,6 +135,21 @@ fn run(args: Args) -> Result<()> {
             args.ib_port,
             port_state
         );
+
+        match args.qp_type {
+            QueuePairType::RC => {}
+            QueuePairType::UD => {
+                let mtu_size = port_attr.active_mtu().size();
+                info!(?mtu_size);
+
+                ensure!(
+                    args.size <= mtu_size,
+                    "message size larger than port MTU ({})",
+                    mtu_size
+                );
+            }
+            _ => unimplemented!(),
+        }
     }
 
     let cc = CompChannel::create(&ctx)?;
@@ -173,7 +189,7 @@ fn run(args: Args) -> Result<()> {
             .send_cq(&cq)
             .recv_cq(&cq)
             .cap(cap)
-            .qp_type(QueuePairType::RC)
+            .qp_type(args.qp_type)
             .sq_sig_all(true)
             .pd(&pd);
         QueuePair::create(&ctx, options)?
@@ -181,14 +197,29 @@ fn run(args: Args) -> Result<()> {
 
     initialize(&qp, &args)?;
 
+    let local_dest = local_dest(&ctx, &qp, args.ib_port, args.gid_idx)?;
+    info!("local dest:\n{:#?}", local_dest);
+
+    let remote_dest = exchange_dest_over_tcp(args.server, args.port, &local_dest)?;
+    info!("remote dest:\n{:#?}", remote_dest);
+
+    let ah = match args.qp_type {
+        QueuePairType::RC => {
+            rc_activate(&qp, &local_dest, &remote_dest, &args)?;
+            None
+        }
+        QueuePairType::UD => {
+            let ah = ud_activate(&pd, &qp, &local_dest, &remote_dest, &args)?;
+            Some(ah)
+        }
+        _ => unimplemented!(),
+    };
+
     {
-        let local_dest = local_dest(&ctx, &qp, args.ib_port, args.gid_idx)?;
-        info!("local dest:\n{:#?}", local_dest);
-
-        let remote_dest = exchange_dest_over_tcp(args.server, args.port, &local_dest)?;
-        info!("remote dest:\n{:#?}", remote_dest);
-
-        rc_activate(&qp, &local_dest, &remote_dest, &args)?;
+        match args.qp_type {
+            QueuePairType::RC => {}
+            _ => todo!(),
+        }
     }
 
     let time_sec = {
@@ -280,11 +311,18 @@ fn choose_device<'dl>(dev_list: &'dl DeviceList, name: Option<&str>) -> Result<&
 
 fn initialize(qp: &QueuePair, args: &Args) -> Result<()> {
     let mut options = qp::ModifyOptions::default();
+
     options
         .qp_state(QueuePairState::Initialize)
         .pkey_index(0)
-        .port_num(args.ib_port)
-        .qp_access_flags(AccessFlags::empty());
+        .port_num(args.ib_port);
+
+    match args.qp_type {
+        QueuePairType::RC => options.qp_access_flags(AccessFlags::empty()),
+        QueuePairType::UD => options.qkey(UD_QKEY),
+        _ => unimplemented!(),
+    };
+
     qp.modify(options)?;
     Ok(())
 }
@@ -393,6 +431,48 @@ fn rc_activate(qp: &QueuePair, local_dest: &Dest, remote_dest: &Dest, args: &Arg
     }
 
     Ok(())
+}
+
+fn ud_activate(
+    pd: &ProtectionDomain,
+    qp: &QueuePair,
+    local_dest: &Dest,
+    remote_dest: &Dest,
+    args: &Args,
+) -> Result<AddressHandle> {
+    {
+        let mut options = qp::ModifyOptions::default();
+        options.qp_state(QueuePairState::ReadyToReceive);
+
+        qp.modify(options).context("failed to modify QP to RTR")?;
+    }
+
+    {
+        let mut options = qp::ModifyOptions::default();
+        options
+            .qp_state(QueuePairState::ReadyToSend)
+            .sq_psn(local_dest.psn);
+
+        qp.modify(options).context("failed to modify QP to RTS")?;
+    }
+
+    {
+        let mut options = AddressHandle::options();
+        options.dest_lid(remote_dest.lid).port_num(args.ib_port);
+
+        if remote_dest.gid.interface_id() != 0 {
+            options.global_route_header(GlobalRoute {
+                dest_gid: remote_dest.gid,
+                flow_label: 0,
+                sgid_index: args.gid_idx.numeric_cast(),
+                hop_limit: 1,
+                traffic_class: 0,
+            });
+        }
+
+        let ah = AddressHandle::create(pd, options)?;
+        Ok(ah)
+    }
 }
 
 unsafe fn rc_post_recv(qp: &QueuePair, recv_mr: &mut MemoryRegion, n: usize) -> Result<()> {
