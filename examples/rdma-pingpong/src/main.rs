@@ -275,15 +275,19 @@ fn run(args: Args) -> Result<()> {
 
             loop {
                 if recv_req_cnt <= 1 {
+                    trace!("post recv");
                     for _ in 0..args.rx_depth {
                         unsafe { qp.post_recv(&recv_wr)? };
                     }
                     recv_req_cnt += args.rx_depth;
                 }
                 if send_req_cnt < 1 && send_comp_cnt < args.iters {
+                    trace!("post send");
                     unsafe { qp.post_send(&send_wr)? };
                     send_req_cnt += 1;
                 }
+
+                trace!("poll cq");
 
                 let wcs = cq.poll(&mut wc_buf)?;
 
