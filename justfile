@@ -38,6 +38,6 @@ bench-pingpong:
     ibv_rc_pingpong -g 2 -e 127.0.0.1
     sleep 0.1
     export RUST_LOG=warn
-    rdma-rcpp &
+    rdma-pingpong &
     sleep 0.1
-    rdma-rcpp 127.0.0.1
+    rdma-pingpong 127.0.0.1
