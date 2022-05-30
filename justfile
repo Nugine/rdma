@@ -30,3 +30,14 @@ install-examples:
 
 udeps:
     cargo udeps --workspace --all-features
+
+bench-pingpong:
+    #!/bin/bash -ex
+    ibv_rc_pingpong -g 2 -e &
+    sleep 0.1
+    ibv_rc_pingpong -g 2 -e 127.0.0.1
+    sleep 0.1
+    export RUST_LOG=warn
+    rdma-rcpp &
+    sleep 0.1
+    rdma-rcpp 127.0.0.1
