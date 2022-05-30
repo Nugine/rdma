@@ -2,7 +2,7 @@ use crate::ah::AddressHandleOptions;
 use crate::cq::{self, CompletionQueue};
 use crate::ctx::Context;
 use crate::device::Mtu;
-use crate::error::{create_resource, from_errno};
+use crate::error::{create_resource, from_errno, get_errno, set_errno};
 use crate::mr::AccessFlags;
 use crate::pd::{self, ProtectionDomain};
 use crate::resource::Resource;
@@ -86,9 +86,14 @@ impl QueuePair {
         let qp = self.ffi_ptr();
         let wr: *mut C::ibv_send_wr = <*mut SendRequest>::cast(send_wr);
         let mut bad_wr: *mut C::ibv_send_wr = ptr::null_mut();
+        set_errno(0);
         let ret = C::ibv_post_send(qp, wr, &mut bad_wr);
         if ret != 0 {
-            return Err(from_errno(ret));
+            let errno = get_errno();
+            if errno != 0 {
+                return Err(from_errno(errno));
+            }
+            return Err(from_errno(ret.abs()));
         }
         Ok(())
     }
@@ -100,9 +105,14 @@ impl QueuePair {
         let qp = self.ffi_ptr();
         let wr: *mut C::ibv_recv_wr = <*mut RecvRequest>::cast(recv_wr);
         let mut bad_wr: *mut C::ibv_recv_wr = ptr::null_mut();
+        set_errno(0);
         let ret = C::ibv_post_recv(qp, wr, &mut bad_wr);
         if ret != 0 {
-            return Err(from_errno(ret));
+            let errno = get_errno();
+            if errno != 0 {
+                return Err(from_errno(errno));
+            }
+            return Err(from_errno(ret.abs()));
         }
         Ok(())
     }
