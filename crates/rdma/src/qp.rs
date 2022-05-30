@@ -347,6 +347,7 @@ impl ModifyOptions {
     modify_option!(IBV_QP_STATE, qp_state, QueuePairState, qp_state.to_c_uint());
     modify_option!(IBV_QP_PKEY_INDEX, pkey_index, u16, pkey_index);
     modify_option!(IBV_QP_PORT, port_num, u8, port_num);
+    modify_option!(IBV_QP_QKEY, qkey, u32, qkey);
     modify_option!(
         IBV_QP_ACCESS_FLAGS,
         qp_access_flags,
