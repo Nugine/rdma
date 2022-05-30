@@ -33,11 +33,11 @@ udeps:
 
 bench-pingpong:
     #!/bin/bash -ex
-    ibv_rc_pingpong -g 2 -e &
+    ibv_rc_pingpong -g 2 -e -s 1024 &
     sleep 0.1
-    ibv_rc_pingpong -g 2 -e 127.0.0.1
+    ibv_rc_pingpong -g 2 -e -s 1024 127.0.0.1
     sleep 0.1
     export RUST_LOG=warn
-    rdma-pingpong &
+    rdma-pingpong rc &
     sleep 0.1
-    rdma-pingpong 127.0.0.1
+    rdma-pingpong rc 127.0.0.1

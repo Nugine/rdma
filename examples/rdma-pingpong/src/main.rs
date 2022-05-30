@@ -4,7 +4,7 @@ use rdma::ah::{AddressHandle, GlobalRoute};
 use rdma::cc::CompChannel;
 use rdma::cq::CompletionQueue;
 use rdma::ctx::Context;
-use rdma::device::{Device, DeviceList, Gid, GidEntry, LinkLayer, Mtu, PortAttr};
+use rdma::device::{Device, DeviceList, Gid, GidEntry, LinkLayer, Mtu, PortAttr, PortState};
 use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
 use rdma::qp::{self, QueuePair};
@@ -19,7 +19,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::slice;
 use std::time::Instant;
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{anyhow, ensure, Context as _, Result};
 use clap::Parser;
 use numeric_cast::NumericCast;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ struct Args {
     ib_dev: Option<String>,
 
     /// size of message to exchange
-    #[clap(short = 's', long, default_value = "4096")]
+    #[clap(short = 's', long, default_value = "1024")]
     size: usize,
 
     /// number of receives to post at a time
@@ -55,7 +55,18 @@ struct Args {
     #[clap(short = 'n', long, default_value = "1000")]
     iters: usize,
 
+    #[clap(parse(try_from_str = parse_qp_type))]
+    qp_type: QueuePairType,
+
     server: Option<IpAddr>,
+}
+
+fn parse_qp_type(s: &str) -> Result<QueuePairType> {
+    match s {
+        "rc" => Ok(QueuePairType::RC),
+        "ud" => Ok(QueuePairType::UD),
+        _ => Err(anyhow!("unsupported qp type")),
+    }
 }
 
 fn main() -> Result<()> {
@@ -63,7 +74,7 @@ fn main() -> Result<()> {
         env::set_var("RUST_BACKTRACE", "full")
     }
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "rdma_rcpp=trace,rdma_pingpong=trace,rdma=trace")
+        env::set_var("RUST_LOG", "rdma_pingpong=trace,rdma=trace")
     }
 
     tracing_subscriber::fmt::init();
@@ -88,14 +99,22 @@ struct Dest {
     gid: Gid,
 }
 
-const RECV_WRID: u64 = 1 << 0;
-const SEND_WRID: u64 = 1 << 1;
+const RECV_WRID: u64 = 1;
+const SEND_WRID: u64 = 2;
 const UNINIT_WC: MaybeUninit<WorkCompletion> = MaybeUninit::uninit();
 
 fn run(args: Args) -> Result<()> {
-    assert_ne!(args.size, 0);
-    let mut send_buf: Vec<u8> = vec![0; args.size];
-    let mut recv_buf: Vec<u8> = vec![0; args.size];
+    ensure!(args.size > 0);
+
+    let msg_size = args.size.numeric_cast::<u32>();
+    let buf_size = match args.qp_type {
+        QueuePairType::RC => args.size,
+        QueuePairType::UD => args.size.checked_add(40).unwrap(),
+        _ => unimplemented!(),
+    };
+
+    let mut send_buf: Vec<u8> = vec![0; buf_size];
+    let mut recv_buf: Vec<u8> = vec![0; buf_size];
 
     let ctx = {
         let dev_list = DeviceList::available()?;
@@ -103,6 +122,19 @@ fn run(args: Args) -> Result<()> {
         info!("device name: {}", dev.name());
         Context::open(dev)?
     };
+
+    {
+        let port_attr = PortAttr::query(&ctx, args.ib_port)?;
+        let port_state = port_attr.state();
+        info!(?port_state);
+
+        ensure!(
+            port_state == PortState::Active,
+            "ib port {} is not active ({:?})",
+            args.ib_port,
+            port_state
+        );
+    }
 
     let cc = CompChannel::create(&ctx)?;
 
