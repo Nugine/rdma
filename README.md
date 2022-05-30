@@ -58,21 +58,42 @@ $ rdma-devices
 |          rxe0          |    26418cfffe021df9    |
 ```
 
-Run the example `rdma-rcpp`:
+Run the example `rdma-pingpong`:
 
-Server side:
++ RC service
+    + server side
+        ```bash
+        rdma-pingpong rc
+        ```
+    + client side
+        ```bash
+        rdma-pingpong rc 127.0.0.1
+        ```
 
++ UD service
+    + server side
+        ```bash
+        rdma-pingpong ud
+        ```
+    + client side
+        ```bash
+        rdma-pingpong ud 127.0.0.1
+        ```
+
+Run the benchmarks:
+
+```bash
+just bench-pingpong-rc
+just bench-pingpong-ud
 ```
-rdma-rcpp
-```
 
-Client side:
+## Memory Management
 
-```
-rdma-rcpp 127.0.0.1
-```
+All the APIs related with raw memory are unsafe.
 
-## Resources
+We are exploring how to provide a safe and easy way to manage memory in RDMA.
+
+## Resource Management
 
 The RDMA resources are managed by reference counting.
 
