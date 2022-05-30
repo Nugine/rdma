@@ -53,5 +53,6 @@ pub mod mr;
 pub mod mw;
 pub mod pd;
 pub mod qp;
+pub mod srq;
 pub mod wc;
 pub mod wr;
