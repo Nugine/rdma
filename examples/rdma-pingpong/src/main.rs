@@ -243,7 +243,8 @@ fn run(args: Args) -> Result<()> {
         let mut wr = wr::SendRequest::zeroed();
         wr.id(SEND_WRID)
             .sg_list(slice::from_ref(&send_sge))
-            .opcode(wr::Opcode::Send);
+            .opcode(wr::Opcode::Send)
+            .send_flags(wr::SendFlags::SIGNALED);
 
         match args.qp_type {
             QueuePairType::RC => {}
