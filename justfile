@@ -14,7 +14,7 @@ doc:
 sync-version:
     #!/bin/bash -e
     cd {{justfile_directory()}}
-    vers='0.2.0'
+    vers='0.3.0-dev'
     echo $vers
     for pkg in `fd --glob '*' -t d -d 1 ./crates ./examples`
     do
