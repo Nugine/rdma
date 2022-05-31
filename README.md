@@ -99,4 +99,4 @@ The RDMA resources are managed by reference counting.
 
 The graph below shows the relations between resources.
 
-![docs/ref.svg](docs/ref.svg)
+![docs/ref/ref.svg](docs/ref/ref.svg)
