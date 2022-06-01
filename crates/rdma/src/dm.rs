@@ -1,22 +1,13 @@
 use crate::bindings as C;
-use crate::ctx::{self, Context};
+use crate::ctx::Context;
 use crate::error::create_resource;
-use crate::resource::Resource;
 
 use std::ptr::NonNull;
 use std::sync::Arc;
 use std::{io, mem};
 
+#[derive(Clone)]
 pub struct DeviceMemory(Arc<Owner>);
-
-/// SAFETY: resource type
-unsafe impl Resource for DeviceMemory {
-    type Owner = Owner;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl DeviceMemory {
     #[inline]
@@ -36,16 +27,16 @@ impl DeviceMemory {
             )?;
             Arc::new(Owner {
                 dm,
-                _ctx: ctx.strong_ref(),
+                _ctx: ctx.clone(),
             })
         };
         Ok(Self(owner))
     }
 }
 
-pub(crate) struct Owner {
+struct Owner {
     dm: NonNull<C::ibv_dm>,
-    _ctx: Arc<ctx::Owner>,
+    _ctx: Context,
 }
 
 /// SAFETY: owned type

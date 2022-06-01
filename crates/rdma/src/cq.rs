@@ -1,8 +1,7 @@
 use crate::bindings as C;
-use crate::cc::{self, CompChannel};
-use crate::ctx::{self, Context};
+use crate::cc::CompChannel;
+use crate::ctx::Context;
 use crate::error::{create_resource, from_errno};
-use crate::resource::Resource;
 use crate::utils::{bool_to_c_int, ptr_as_mut};
 use crate::wc::WorkCompletion;
 
@@ -18,15 +17,6 @@ use numeric_cast::NumericCast;
 
 #[derive(Clone)]
 pub struct CompletionQueue(Arc<Owner>);
-
-/// SAFETY: resource type
-unsafe impl Resource for CompletionQueue {
-    type Owner = Owner;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl CompletionQueue {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_cq_ex {
@@ -61,7 +51,7 @@ impl CompletionQueue {
                 cq,
                 user_data: options.user_data,
                 comp_events_completed: AtomicU32::new(0),
-                _ctx: ctx.strong_ref(),
+                _ctx: ctx.clone(),
                 cc: options.channel,
             })
         };
@@ -153,8 +143,8 @@ pub(crate) struct Owner {
     user_data: usize,
     comp_events_completed: AtomicU32,
 
-    cc: Option<Arc<cc::Owner>>,
-    _ctx: Arc<ctx::Owner>,
+    cc: Option<CompChannel>,
+    _ctx: Context,
 }
 
 /// SAFETY: owned type
@@ -192,7 +182,7 @@ impl Drop for Owner {
 pub struct CompletionQueueOptions {
     cqe: usize,
     user_data: usize,
-    channel: Option<Arc<cc::Owner>>,
+    channel: Option<CompChannel>,
 }
 
 impl CompletionQueueOptions {
@@ -208,7 +198,7 @@ impl CompletionQueueOptions {
     }
     #[inline]
     pub fn channel(&mut self, cc: &CompChannel) -> &mut Self {
-        self.channel = Some(cc.strong_ref());
+        self.channel = Some(cc.clone());
         self
     }
 }

@@ -39,7 +39,6 @@ pub mod bindings {
 }
 
 mod error;
-mod resource;
 mod weakset;
 
 pub mod device;

@@ -1,16 +1,15 @@
 use crate::ah::AddressHandleOptions;
-use crate::cq::{self, CompletionQueue};
+use crate::bindings as C;
+use crate::cq::CompletionQueue;
 use crate::ctx::Context;
 use crate::device::Mtu;
 use crate::error::{create_resource, from_errno, get_errno, set_errno};
 use crate::mr::AccessFlags;
-use crate::pd::{self, ProtectionDomain};
-use crate::resource::Resource;
+use crate::pd::ProtectionDomain;
 use crate::srq::SharedReceiveQueue;
 use crate::utils::{bool_to_c_int, c_uint_to_u32, ptr_as_mut, u32_as_c_uint};
 use crate::utils::{usize_to_void_ptr, void_ptr_to_usize};
 use crate::wr::{RecvRequest, SendRequest};
-use crate::{bindings as C, srq};
 
 use std::mem::MaybeUninit;
 use std::os::raw::{c_int, c_uint};
@@ -20,15 +19,6 @@ use std::{io, mem};
 
 #[derive(Clone)]
 pub struct QueuePair(Arc<Owner>);
-
-/// SAFETY: resource type
-unsafe impl Resource for QueuePair {
-    type Owner = Owner;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl QueuePair {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_qp {
@@ -150,12 +140,12 @@ impl QueuePair {
     }
 }
 
-pub(crate) struct Owner {
+struct Owner {
     qp: NonNull<C::ibv_qp>,
 
-    _pd: Option<Arc<pd::Owner>>,
-    _send_cq: Option<Arc<cq::Owner>>,
-    _recv_cq: Option<Arc<cq::Owner>>,
+    _pd: Option<ProtectionDomain>,
+    _send_cq: Option<CompletionQueue>,
+    _recv_cq: Option<CompletionQueue>,
 }
 
 /// SAFETY: owned type
@@ -212,10 +202,10 @@ impl QueuePairCapacity {
 pub struct QueuePairOptions {
     attr: C::ibv_qp_init_attr_ex,
 
-    send_cq: Option<Arc<cq::Owner>>,
-    recv_cq: Option<Arc<cq::Owner>>,
-    pd: Option<Arc<pd::Owner>>,
-    srq: Option<Arc<srq::Owner>>,
+    send_cq: Option<CompletionQueue>,
+    recv_cq: Option<CompletionQueue>,
+    pd: Option<ProtectionDomain>,
+    srq: Option<SharedReceiveQueue>,
 }
 
 // SAFETY: owned type
@@ -247,7 +237,7 @@ impl QueuePairOptions {
     #[inline]
     pub fn send_cq(&mut self, send_cq: &CompletionQueue) -> &mut Self {
         self.attr.send_cq = C::ibv_cq_ex_to_cq(send_cq.ffi_ptr());
-        self.send_cq = Some(send_cq.strong_ref());
+        self.send_cq = Some(send_cq.clone());
         self
     }
 
@@ -257,7 +247,7 @@ impl QueuePairOptions {
             self.attr.srq = ptr::null_mut();
         }
         self.attr.recv_cq = C::ibv_cq_ex_to_cq(recv_cq.ffi_ptr());
-        self.recv_cq = Some(recv_cq.strong_ref());
+        self.recv_cq = Some(recv_cq.clone());
         self
     }
 
@@ -283,7 +273,7 @@ impl QueuePairOptions {
     pub fn pd(&mut self, pd: &ProtectionDomain) -> &mut Self {
         self.attr.pd = pd.ffi_ptr();
         self.attr.comp_mask |= C::IBV_QP_INIT_ATTR_PD;
-        self.pd = Some(pd.strong_ref());
+        self.pd = Some(pd.clone());
         self
     }
 
@@ -293,7 +283,7 @@ impl QueuePairOptions {
             self.attr.recv_cq = ptr::null_mut();
         }
         self.attr.srq = srq.ffi_ptr();
-        self.srq = Some(srq.strong_ref());
+        self.srq = Some(srq.clone());
         self
     }
 }

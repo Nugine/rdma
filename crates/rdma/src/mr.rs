@@ -1,7 +1,6 @@
 use crate::bindings as C;
 use crate::error::create_resource;
-use crate::pd::{self, ProtectionDomain};
-use crate::resource::Resource;
+use crate::pd::ProtectionDomain;
 use crate::utils::{c_uint_to_u32, ptr_to_addr, u32_as_c_uint};
 
 use std::io;
@@ -12,16 +11,8 @@ use std::sync::Arc;
 use bitflags::bitflags;
 use numeric_cast::NumericCast;
 
+#[derive(Clone)]
 pub struct MemoryRegion<T = ()>(Arc<Owner<T>>);
-
-/// SAFETY: resource type
-unsafe impl<T: Send + Sync> Resource for MemoryRegion<T> {
-    type Owner = Owner<T>;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl<T> MemoryRegion<T> {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_mr {
@@ -52,7 +43,7 @@ impl<T> MemoryRegion<T> {
             Arc::new(Owner {
                 mr,
                 metadata,
-                _pd: pd.strong_ref(),
+                _pd: pd.clone(),
             })
         };
         Ok(Self(owner))
@@ -105,12 +96,12 @@ impl<T> MemoryRegion<T> {
     }
 }
 
-pub(crate) struct Owner<T> {
+struct Owner<T> {
     mr: NonNull<C::ibv_mr>,
 
     metadata: T,
 
-    _pd: Arc<pd::Owner>,
+    _pd: ProtectionDomain,
 }
 
 /// SAFETY: owned type

@@ -1,8 +1,7 @@
 use crate::bindings as C;
 use crate::device::Gid;
 use crate::error::create_resource;
-use crate::pd::{self, ProtectionDomain};
-use crate::resource::Resource;
+use crate::pd::ProtectionDomain;
 
 use std::io;
 use std::mem;
@@ -34,17 +33,17 @@ impl AddressHandle {
             )?;
             Arc::new(Owner {
                 ah,
-                _pd: pd.strong_ref(),
+                _pd: pd.clone(),
             })
         };
         Ok(Self(owner))
     }
 }
 
-pub(crate) struct Owner {
+struct Owner {
     ah: NonNull<C::ibv_ah>,
 
-    _pd: Arc<pd::Owner>,
+    _pd: ProtectionDomain,
 }
 
 // SAFETY: owned type

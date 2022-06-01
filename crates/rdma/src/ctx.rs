@@ -1,7 +1,6 @@
 use crate::bindings as C;
 use crate::device::Device;
 use crate::error::create_resource;
-use crate::resource::Resource;
 
 use std::io;
 use std::ptr::NonNull;
@@ -9,15 +8,6 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Context(Arc<Owner>);
-
-/// SAFETY: resource type
-unsafe impl Resource for Context {
-    type Owner = Owner;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl Context {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_context {
@@ -38,7 +28,7 @@ impl Context {
     }
 }
 
-pub(crate) struct Owner {
+struct Owner {
     ctx: NonNull<C::ibv_context>,
 }
 

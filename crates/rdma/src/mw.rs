@@ -1,7 +1,6 @@
 use crate::bindings as C;
 use crate::error::create_resource;
-use crate::pd::{self, ProtectionDomain};
-use crate::resource::Resource;
+use crate::pd::ProtectionDomain;
 use crate::utils::{c_uint_to_u32, u32_as_c_uint};
 
 use std::io;
@@ -9,16 +8,8 @@ use std::os::raw::c_uint;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct MemoryWindow(Arc<Owner>);
-
-/// SAFETY: resource type
-unsafe impl Resource for MemoryWindow {
-    type Owner = Owner;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl MemoryWindow {
     #[inline]
@@ -32,16 +23,16 @@ impl MemoryWindow {
             )?;
             Arc::new(Owner {
                 mw,
-                _pd: pd.strong_ref(),
+                _pd: pd.clone(),
             })
         };
         Ok(Self(owner))
     }
 }
 
-pub(crate) struct Owner {
+struct Owner {
     mw: NonNull<C::ibv_mw>,
-    _pd: Arc<pd::Owner>,
+    _pd: ProtectionDomain,
 }
 
 /// SAFETY: owned type

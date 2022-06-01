@@ -1,8 +1,7 @@
 use crate::bindings as C;
 use crate::cq::{self, CompletionQueue};
-use crate::ctx::{self, Context};
+use crate::ctx::Context;
 use crate::error::{create_resource, custom_error};
-use crate::resource::Resource;
 use crate::weakset::WeakSet;
 
 use std::os::raw::c_void;
@@ -15,15 +14,6 @@ use parking_lot::Mutex;
 
 #[derive(Clone)]
 pub struct CompChannel(Arc<Owner>);
-
-/// SAFETY: resource type
-unsafe impl Resource for CompChannel {
-    type Owner = Owner;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl CompChannel {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_comp_channel {
@@ -42,7 +32,7 @@ impl CompChannel {
             Arc::new(Owner {
                 cc,
                 cq_ref: Mutex::new(WeakSet::new()),
-                _ctx: ctx.strong_ref(),
+                _ctx: ctx.clone(),
             })
         };
         Ok(Self(owner))
@@ -67,6 +57,14 @@ impl CompChannel {
         // 3. here may panic because the cq may have been destroyed
         unsafe { Ok(CompletionQueue::from_cq_context(cq_context)) }
     }
+
+    pub(crate) fn add_cq_ref(&self, cq: Weak<cq::Owner>) {
+        self.0.cq_ref.lock().insert(cq);
+    }
+
+    pub(crate) fn del_cq_ref(&self, cq: &cq::Owner) -> bool {
+        self.0.cq_ref.lock().remove(cq)
+    }
 }
 
 impl AsRawFd for CompChannel {
@@ -78,11 +76,11 @@ impl AsRawFd for CompChannel {
     }
 }
 
-pub(crate) struct Owner {
+struct Owner {
     cc: NonNull<C::ibv_comp_channel>,
 
     cq_ref: Mutex<WeakSet<cq::Owner>>,
-    _ctx: Arc<ctx::Owner>,
+    _ctx: Context,
 }
 
 /// SAFETY: owned type
@@ -93,14 +91,6 @@ unsafe impl Sync for Owner {}
 impl Owner {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_comp_channel {
         self.cc.as_ptr()
-    }
-
-    pub(crate) fn add_cq_ref(&self, cq: Weak<cq::Owner>) {
-        self.cq_ref.lock().insert(cq);
-    }
-
-    pub(crate) fn del_cq_ref(&self, cq: &cq::Owner) -> bool {
-        self.cq_ref.lock().remove(cq)
     }
 }
 

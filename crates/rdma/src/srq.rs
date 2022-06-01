@@ -1,10 +1,7 @@
 use crate::bindings as C;
-use crate::ctx;
 use crate::ctx::Context;
 use crate::error::create_resource;
-use crate::pd;
 use crate::pd::ProtectionDomain;
-use crate::resource::Resource;
 use crate::utils::usize_to_void_ptr;
 
 use std::io;
@@ -12,16 +9,8 @@ use std::mem;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct SharedReceiveQueue(Arc<Owner>);
-
-/// SAFETY: resource type
-unsafe impl Resource for SharedReceiveQueue {
-    type Owner = Owner;
-
-    fn as_owner(&self) -> &Arc<Self::Owner> {
-        &self.0
-    }
-}
 
 impl SharedReceiveQueue {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_srq {
@@ -55,7 +44,7 @@ impl SharedReceiveQueue {
 
             Arc::new(Owner {
                 srq,
-                _ctx: ctx.strong_ref(),
+                _ctx: ctx.clone(),
                 _pd: options.pd,
             })
         };
@@ -63,11 +52,11 @@ impl SharedReceiveQueue {
     }
 }
 
-pub(crate) struct Owner {
+struct Owner {
     srq: NonNull<C::ibv_srq>,
 
-    _ctx: Arc<ctx::Owner>,
-    _pd: Option<Arc<pd::Owner>>,
+    _ctx: Context,
+    _pd: Option<ProtectionDomain>,
 }
 
 /// SAFETY: owned type
@@ -94,7 +83,7 @@ impl Drop for Owner {
 
 pub struct SharedReceiveQueueOptions {
     attr: C::ibv_srq_init_attr_ex,
-    pd: Option<Arc<pd::Owner>>,
+    pd: Option<ProtectionDomain>,
 }
 
 impl Default for SharedReceiveQueueOptions {
@@ -113,7 +102,7 @@ impl SharedReceiveQueueOptions {
     pub fn protection_domain(&mut self, pd: &ProtectionDomain) -> &mut Self {
         self.attr.pd = pd.ffi_ptr();
         self.attr.comp_mask |= C::IBV_SRQ_INIT_ATTR_PD;
-        self.pd = Some(pd.strong_ref());
+        self.pd = Some(pd.clone());
         self
     }
 
