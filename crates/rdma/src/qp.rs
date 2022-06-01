@@ -46,8 +46,9 @@ impl QueuePair {
             Arc::new(Owner {
                 qp,
                 _pd: options.pd,
-                _send_cq: options.send_cq,
-                _recv_cq: options.recv_cq,
+                send_cq: options.send_cq,
+                recv_cq: options.recv_cq,
+                _srq: options.srq,
             })
         };
         Ok(Self(owner))
@@ -138,14 +139,27 @@ impl QueuePair {
             Ok(attr)
         }
     }
+
+    #[inline]
+    #[must_use]
+    pub fn send_cq(&self) -> Option<&CompletionQueue> {
+        self.0.send_cq.as_ref()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn recv_cq(&self) -> Option<&CompletionQueue> {
+        self.0.recv_cq.as_ref()
+    }
 }
 
 struct Owner {
     qp: NonNull<C::ibv_qp>,
 
     _pd: Option<ProtectionDomain>,
-    _send_cq: Option<CompletionQueue>,
-    _recv_cq: Option<CompletionQueue>,
+    send_cq: Option<CompletionQueue>,
+    recv_cq: Option<CompletionQueue>,
+    _srq: Option<SharedReceiveQueue>,
 }
 
 /// SAFETY: owned type
