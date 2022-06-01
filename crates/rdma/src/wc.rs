@@ -11,13 +11,8 @@ pub struct WorkCompletion(C::ibv_wc);
 
 impl WorkCompletion {
     #[inline]
-    pub fn status(&self) -> Result<(), WorkCompletionError> {
-        WorkCompletionError::convert_status(self.raw_status())
-    }
-
-    #[inline]
     #[must_use]
-    pub fn raw_status(&self) -> u32 {
+    pub fn status(&self) -> u32 {
         self.0.status.numeric_cast()
     }
 
@@ -58,7 +53,7 @@ pub enum WorkCompletionError {
 
 impl WorkCompletionError {
     #[inline]
-    pub fn convert_status(status: u32) -> Result<(), WorkCompletionError> {
+    pub fn result(status: u32) -> Result<(), WorkCompletionError> {
         let status: c_uint = status.numeric_cast();
         if status == C::IBV_WC_SUCCESS {
             Ok(())

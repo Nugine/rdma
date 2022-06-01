@@ -9,7 +9,7 @@ use rdma::mr::{AccessFlags, MemoryRegion};
 use rdma::pd::ProtectionDomain;
 use rdma::qp::{self, QueuePair};
 use rdma::qp::{QueuePairCapacity, QueuePairState, QueuePairType};
-use rdma::wc::WorkCompletion;
+use rdma::wc::{WorkCompletion, WorkCompletionError};
 use rdma::wr;
 
 use std::env;
@@ -293,7 +293,7 @@ fn run(args: Args) -> Result<()> {
                 let wcs = cq.poll(&mut wc_buf)?;
 
                 for wc in &mut *wcs {
-                    wc.status()?;
+                    WorkCompletionError::result(wc.status())?;
 
                     match wc.wr_id() {
                         SEND_WRID => {
