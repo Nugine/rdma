@@ -160,13 +160,13 @@ fn run(args: Args) -> Result<()> {
         let addr = send_buf.as_mut_ptr();
         let length = send_buf.len();
         let access_flags = AccessFlags::LOCAL_WRITE;
-        MemoryRegion::register(&pd, addr, length, access_flags)?
+        MemoryRegion::register(&pd, addr, length, access_flags, ())?
     };
     let recv_mr = unsafe {
         let addr = recv_buf.as_mut_ptr();
         let length = recv_buf.len();
         let access_flags = AccessFlags::LOCAL_WRITE;
-        MemoryRegion::register(&pd, addr, length, access_flags)?
+        MemoryRegion::register(&pd, addr, length, access_flags, ())?
     };
 
     let cq = {

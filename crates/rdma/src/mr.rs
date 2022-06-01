@@ -12,18 +12,18 @@ use std::sync::Arc;
 use bitflags::bitflags;
 use numeric_cast::NumericCast;
 
-pub struct MemoryRegion(Arc<Owner>);
+pub struct MemoryRegion<T = ()>(Arc<Owner<T>>);
 
 /// SAFETY: resource type
-unsafe impl Resource for MemoryRegion {
-    type Owner = Owner;
+unsafe impl<T: Send + Sync> Resource for MemoryRegion<T> {
+    type Owner = Owner<T>;
 
     fn as_owner(&self) -> &Arc<Self::Owner> {
         &self.0
     }
 }
 
-impl MemoryRegion {
+impl<T> MemoryRegion<T> {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_mr {
         self.0.ffi_ptr()
     }
@@ -40,6 +40,7 @@ impl MemoryRegion {
         addr: *mut u8,
         length: usize,
         access_flags: AccessFlags,
+        metadata: T,
     ) -> io::Result<Self> {
         let owner = {
             let addr: *mut c_void = addr.cast();
@@ -50,6 +51,7 @@ impl MemoryRegion {
             )?;
             Arc::new(Owner {
                 mr,
+                metadata,
                 _pd: pd.strong_ref(),
             })
         };
@@ -95,26 +97,38 @@ impl MemoryRegion {
         // SAFETY: reading a immutable field of a concurrent ffi type
         unsafe { (*mr).length }
     }
+
+    #[inline]
+    #[must_use]
+    pub fn metadata(&self) -> &T {
+        self.0.metadata()
+    }
 }
 
-pub(crate) struct Owner {
+pub(crate) struct Owner<T> {
     mr: NonNull<C::ibv_mr>,
+
+    metadata: T,
 
     _pd: Arc<pd::Owner>,
 }
 
 /// SAFETY: owned type
-unsafe impl Send for Owner {}
+unsafe impl<T: Send> Send for Owner<T> {}
 /// SAFETY: owned type
-unsafe impl Sync for Owner {}
+unsafe impl<T: Sync> Sync for Owner<T> {}
 
-impl Owner {
+impl<T> Owner<T> {
     pub(crate) fn ffi_ptr(&self) -> *mut C::ibv_mr {
         self.mr.as_ptr()
     }
+
+    fn metadata(&self) -> &T {
+        &self.metadata
+    }
 }
 
-impl Drop for Owner {
+impl<T> Drop for Owner<T> {
     fn drop(&mut self) {
         // SAFETY: ffi
         unsafe {
