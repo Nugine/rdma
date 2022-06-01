@@ -21,6 +21,67 @@ impl WorkCompletion {
     pub fn wr_id(&self) -> u64 {
         self.0.wr_id
     }
+
+    #[inline]
+    #[must_use]
+    pub fn byte_len(&self) -> u32 {
+        self.0.byte_len
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn opcode(&self) -> Opcode {
+        Opcode::from_c_uint(self.0.opcode)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Opcode {
+    Send = c_uint_to_u32(C::IBV_WC_SEND),
+    RdmaWrite = c_uint_to_u32(C::IBV_WC_RDMA_WRITE),
+    RdmaRead = c_uint_to_u32(C::IBV_WC_RDMA_READ),
+    CompSwap = c_uint_to_u32(C::IBV_WC_COMP_SWAP),
+    FetchAdd = c_uint_to_u32(C::IBV_WC_FETCH_ADD),
+    BindMw = c_uint_to_u32(C::IBV_WC_BIND_MW),
+    LocalInv = c_uint_to_u32(C::IBV_WC_LOCAL_INV),
+    Tso = c_uint_to_u32(C::IBV_WC_TSO),
+    Recv = c_uint_to_u32(C::IBV_WC_RECV),
+    RecvRdmaWithImm = c_uint_to_u32(C::IBV_WC_RECV_RDMA_WITH_IMM),
+    TmAdd = c_uint_to_u32(C::IBV_WC_TM_ADD),
+    TmDel = c_uint_to_u32(C::IBV_WC_TM_DEL),
+    TmSync = c_uint_to_u32(C::IBV_WC_TM_SYNC),
+    TmRecv = c_uint_to_u32(C::IBV_WC_TM_RECV),
+    TmNoTag = c_uint_to_u32(C::IBV_WC_TM_NO_TAG),
+    Driver1 = c_uint_to_u32(C::IBV_WC_DRIVER1),
+    Driver2 = c_uint_to_u32(C::IBV_WC_DRIVER2),
+    Driver3 = c_uint_to_u32(C::IBV_WC_DRIVER3),
+}
+
+impl Opcode {
+    fn from_c_uint(val: c_uint) -> Self {
+        match val {
+            C::IBV_WC_SEND => Opcode::Send,
+            C::IBV_WC_RDMA_WRITE => Opcode::RdmaWrite,
+            C::IBV_WC_RDMA_READ => Opcode::RdmaRead,
+            C::IBV_WC_COMP_SWAP => Opcode::CompSwap,
+            C::IBV_WC_FETCH_ADD => Opcode::FetchAdd,
+            C::IBV_WC_BIND_MW => Opcode::BindMw,
+            C::IBV_WC_LOCAL_INV => Opcode::LocalInv,
+            C::IBV_WC_TSO => Opcode::Tso,
+            C::IBV_WC_RECV => Opcode::Recv,
+            C::IBV_WC_RECV_RDMA_WITH_IMM => Opcode::RecvRdmaWithImm,
+            C::IBV_WC_TM_ADD => Opcode::TmAdd,
+            C::IBV_WC_TM_DEL => Opcode::TmDel,
+            C::IBV_WC_TM_SYNC => Opcode::TmSync,
+            C::IBV_WC_TM_RECV => Opcode::TmRecv,
+            C::IBV_WC_TM_NO_TAG => Opcode::TmNoTag,
+            C::IBV_WC_DRIVER1 => Opcode::Driver1,
+            C::IBV_WC_DRIVER2 => Opcode::Driver2,
+            C::IBV_WC_DRIVER3 => Opcode::Driver3,
+            _ => panic!("unknown wc opcode"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
