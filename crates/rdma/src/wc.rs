@@ -1,8 +1,10 @@
+use crate::bindings as C;
+use crate::utils::{c_uint_to_u32, u32_as_c_uint};
+
 use std::os::raw::c_uint;
 use std::{fmt, mem};
 
-use crate::bindings as C;
-use crate::utils::{c_uint_to_u32, u32_as_c_uint};
+use numeric_cast::NumericCast;
 
 #[repr(transparent)]
 pub struct WorkCompletion(C::ibv_wc);
@@ -10,11 +12,13 @@ pub struct WorkCompletion(C::ibv_wc);
 impl WorkCompletion {
     #[inline]
     pub fn status(&self) -> Result<(), WorkCompletionError> {
-        if self.0.status == C::IBV_WC_SUCCESS {
-            Ok(())
-        } else {
-            Err(WorkCompletionError::from_c_uint(self.0.status))
-        }
+        WorkCompletionError::convert_status(self.raw_status())
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn raw_status(&self) -> u32 {
+        self.0.status.numeric_cast()
     }
 
     #[inline]
@@ -53,6 +57,16 @@ pub enum WorkCompletionError {
 }
 
 impl WorkCompletionError {
+    #[inline]
+    pub fn convert_status(status: u32) -> Result<(), WorkCompletionError> {
+        let status: c_uint = status.numeric_cast();
+        if status == C::IBV_WC_SUCCESS {
+            Ok(())
+        } else {
+            Err(WorkCompletionError::from_c_uint(status))
+        }
+    }
+
     fn to_c_uint(self) -> c_uint {
         #[allow(clippy::as_conversions)]
         u32_as_c_uint(self as u32)
