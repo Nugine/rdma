@@ -27,6 +27,7 @@ sync-version:
 install-examples:
     cargo install --offline --path examples/rdma-devices
     cargo install --offline --path examples/rdma-pingpong
+    cargo install --offline --path examples/rdma-async
 
 udeps:
     cargo udeps --workspace --all-features
