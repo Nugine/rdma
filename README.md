@@ -53,9 +53,9 @@ Run the example `rdma-devices`:
 
 ```
 $ rdma-devices
-|          name          |          guid          |
-|------------------------|------------------------|
-|          rxe0          |    26418cfffe021df9    |
+| name | guid             |
+| ---- | ---------------- |
+| rxe0 | 26418cfffe021df9 |
 ```
 
 Run the example `rdma-pingpong`:
@@ -87,11 +87,19 @@ just bench-pingpong-rc
 just bench-pingpong-ud
 ```
 
+Run the example `rdma-async`:
+
+```bash
+rdma-async-rpc
+```
+
 ## Memory Management
 
 All the APIs related with raw memory are unsafe.
 
 We are exploring how to provide a safe and easy way to manage memory in RDMA.
+
+The example [rdma-async](examples/rdma-async/src/bin/rdma-async-rpc.rs) may give you inspiration.
 
 ## Resource Management
 
