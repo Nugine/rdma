@@ -1,15 +1,16 @@
-use crate::buf::Buf;
+use crate::{GatherList, ScatterList};
 
 use rdma::qp::QueuePair;
-use rdma::wc::{self, WorkCompletion, WorkCompletionError};
-use rdma::wr;
+use rdma::wc::{WorkCompletion, WorkCompletionError};
+use rdma::wr::{self, Sge};
+use scopeguard::ScopeGuard;
 
 use std::future::Future;
+use std::io;
 use std::mem::{self, ManuallyDrop};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
-use std::{io, slice};
 
 use anyhow::Result;
 use numeric_cast::NumericCast;
@@ -23,7 +24,13 @@ unsafe trait Operation: Send + Sync + Unpin {
 }
 
 struct Work<T> {
-    state: Arc<Mutex<State<T>>>,
+    inner: Arc<WorkInner<T>>,
+}
+
+#[repr(C)]
+struct WorkInner<T> {
+    complete: unsafe fn(wc: *const WorkCompletion),
+    state: Mutex<State<T>>,
 }
 
 struct State<T> {
@@ -43,22 +50,25 @@ enum Step {
 }
 
 impl<T: Operation> Work<T> {
-    pub fn new(qp: QueuePair, op: T) -> Self {
-        Work {
-            state: Arc::new(Mutex::new(State {
-                step: Step::Pending,
-                waker: None,
-                qp,
-                op: ManuallyDrop::new(op),
-            })),
+    fn new(qp: QueuePair, op: T) -> Self {
+        Self {
+            inner: Arc::new(WorkInner {
+                complete: Self::complete,
+                state: Mutex::new(State {
+                    step: Step::Pending,
+                    waker: None,
+                    qp,
+                    op: ManuallyDrop::new(op),
+                }),
+            }),
         }
     }
 
-    pub unsafe fn complete(wc: &WorkCompletion) {
-        let state_ptr = wc.wr_id() as usize as *mut Mutex<State<T>>;
-        let state = Arc::from_raw(state_ptr);
+    unsafe fn complete(wc: *const WorkCompletion) {
+        let wc = &*wc;
+        let inner: Arc<WorkInner<T>> = Arc::from_raw(wc.wr_id() as usize as *mut _);
         {
-            let mut guard = state.lock();
+            let mut guard: _ = inner.state.lock();
             let state = &mut *guard;
             assert_eq!(state.step, Step::Running);
             state.op.complete(wc);
@@ -71,32 +81,34 @@ impl<T: Operation> Work<T> {
 }
 
 pub unsafe fn complete(wc: &WorkCompletion) {
-    match wc.opcode() {
-        wc::Opcode::Send => Work::<OpSend>::complete(wc),
-        wc::Opcode::Recv => Work::<OpRecv>::complete(wc),
-        _ => unimplemented!(),
-    }
+    let inner: *mut WorkInner<()> = wc.wr_id() as usize as *mut _;
+    ((*inner).complete)(wc)
 }
 
 impl<T: Operation> Future for Work<T> {
     type Output = T;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut guard = self.state.lock();
+        let mut guard = self.inner.state.lock();
         let state = &mut *guard;
         match mem::replace(&mut state.step, Step::Poisoned) {
             Step::Pending => {
-                let state_ptr = Arc::into_raw(Arc::clone(&self.state));
+                let inner_ptr: *const WorkInner<T> = Arc::into_raw(Arc::clone(&self.inner));
+                let arc_guard: _ =
+                    scopeguard::guard((), |()| unsafe { Arc::decrement_strong_count(inner_ptr) });
 
-                let id: u64 = (state_ptr as usize).numeric_cast();
+                let id: u64 = (inner_ptr as usize).numeric_cast();
 
                 if state.op.submit(&state.qp, id) {
+                    // SAFETY: state refcount
+                    ScopeGuard::into_inner(arc_guard);
+
                     state.step = Step::Running;
                     state.waker = Some(cx.waker().clone());
                     Poll::Pending
                 } else {
                     // SAFETY: state refcount
-                    unsafe { Arc::decrement_strong_count(state_ptr) };
+                    drop(arc_guard);
 
                     state.step = Step::Invalid;
                     // SAFETY: managed state machine
@@ -134,15 +146,19 @@ impl<T> Drop for State<T> {
     }
 }
 
-struct OpSend {
-    buf: Buf,
-    nbytes: usize,
+struct OpSend<T> {
+    slist: T,
     res: io::Result<()>,
     status: u32,
 }
 
+impl<T> Unpin for OpSend<T> {}
+
 /// SAFETY: operation type
-unsafe impl Operation for OpSend {
+unsafe impl<T> Operation for OpSend<T>
+where
+    T: ScatterList + Send + Sync,
+{
     fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
         let cq = qp.send_cq().expect("the qp can not post send");
 
@@ -151,16 +167,19 @@ unsafe impl Operation for OpSend {
             return false;
         }
 
-        let send_sge = wr::Sge {
-            addr: self.buf.mr.addr_u64(),
-            length: self.nbytes.numeric_cast(),
-            lkey: self.buf.mr.lkey(),
+        // TODO: small vector optimization
+        let sg_list = unsafe {
+            let len = self.slist.length();
+            let mut v: Vec<Sge> = Vec::with_capacity(len);
+            self.slist.fill(v.as_mut_ptr());
+            v.set_len(len);
+            v
         };
 
         let mut send_wr = wr::SendRequest::zeroed();
         send_wr
             .id(id)
-            .sg_list(slice::from_ref(&send_sge))
+            .sg_list(&sg_list)
             .opcode(wr::Opcode::Send)
             .send_flags(wr::SendFlags::SIGNALED);
 
@@ -174,15 +193,20 @@ unsafe impl Operation for OpSend {
     }
 }
 
-struct OpRecv {
-    buf: Buf,
+struct OpRecv<T> {
+    glist: T,
     res: io::Result<()>,
     status: u32,
     byte_len: u32,
 }
 
+impl<T> Unpin for OpRecv<T> {}
+
 /// SAFETY: operation type
-unsafe impl Operation for OpRecv {
+unsafe impl<T> Operation for OpRecv<T>
+where
+    T: GatherList + Send + Sync,
+{
     fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
         let cq = qp.recv_cq().expect("the qp can not post recv");
 
@@ -191,14 +215,17 @@ unsafe impl Operation for OpRecv {
             return false;
         }
 
-        let recv_sge = wr::Sge {
-            addr: self.buf.mr.addr_u64(),
-            length: self.buf.mr.length().numeric_cast(),
-            lkey: self.buf.mr.lkey(),
+        // TODO: small vector optimization
+        let sg_list = unsafe {
+            let len = self.glist.length();
+            let mut v: Vec<Sge> = Vec::with_capacity(len);
+            self.glist.fill(v.as_mut_ptr());
+            v.set_len(len);
+            v
         };
 
         let mut recv_wr = wr::RecvRequest::zeroed();
-        recv_wr.id(id).sg_list(slice::from_ref(&recv_sge));
+        recv_wr.id(id).sg_list(&sg_list);
 
         // SAFETY: managed state machine
         self.res = unsafe { qp.post_recv(&recv_wr) };
@@ -211,14 +238,14 @@ unsafe impl Operation for OpRecv {
     }
 }
 
-pub async fn send(qp: QueuePair, buf: Buf, nbytes: usize) -> (Result<()>, Buf) {
-    let nbytes = nbytes.min(buf.mr.length());
-
+pub async fn send<T>(qp: QueuePair, slist: T) -> (Result<()>, T)
+where
+    T: ScatterList + Send + Sync,
+{
     let work = Work::new(
         qp,
         OpSend {
-            buf,
-            nbytes,
+            slist,
             res: Ok(()),
             status: u32::MAX,
         },
@@ -227,19 +254,22 @@ pub async fn send(qp: QueuePair, buf: Buf, nbytes: usize) -> (Result<()>, Buf) {
     let op = work.await;
 
     if let Err(err) = op.res {
-        return (Err(err.into()), op.buf);
+        return (Err(err.into()), op.slist);
     }
     if let Err(err) = WorkCompletionError::result(op.status) {
-        return (Err(err.into()), op.buf);
+        return (Err(err.into()), op.slist);
     }
-    (Ok(()), op.buf)
+    (Ok(()), op.slist)
 }
 
-pub async fn recv(qp: QueuePair, buf: Buf) -> (Result<usize>, Buf) {
+pub async fn recv<T>(qp: QueuePair, glist: T) -> (Result<usize>, T)
+where
+    T: GatherList + Send + Sync,
+{
     let work = Work::new(
         qp,
         OpRecv {
-            buf,
+            glist,
             res: Ok(()),
             status: u32::MAX,
             byte_len: 0,
@@ -249,10 +279,10 @@ pub async fn recv(qp: QueuePair, buf: Buf) -> (Result<usize>, Buf) {
     let op = work.await;
 
     if let Err(err) = op.res {
-        return (Err(err.into()), op.buf);
+        return (Err(err.into()), op.glist);
     }
     if let Err(err) = WorkCompletionError::result(op.status) {
-        return (Err(err.into()), op.buf);
+        return (Err(err.into()), op.glist);
     }
-    (Ok(op.byte_len.numeric_cast()), op.buf)
+    (Ok(op.byte_len.numeric_cast()), op.glist)
 }
