@@ -1,4 +1,5 @@
 use crate::driver::RdmaDriver;
+use crate::{LocalAccess, LocalReadAccess, LocalWriteAccess};
 
 use rdma::mr::{AccessFlags, MemoryRegion};
 
@@ -70,3 +71,20 @@ impl Drop for Buf {
         }
     }
 }
+
+unsafe impl LocalAccess for Buf {
+    fn addr_u64(&self) -> u64 {
+        self.mr.addr_u64()
+    }
+
+    fn length(&self) -> usize {
+        self.mr.length()
+    }
+
+    fn lkey(&self) -> u32 {
+        self.mr.lkey()
+    }
+}
+
+unsafe impl LocalReadAccess for Buf {}
+unsafe impl LocalWriteAccess for Buf {}
