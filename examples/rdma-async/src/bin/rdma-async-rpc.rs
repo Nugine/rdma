@@ -56,6 +56,7 @@ async fn server(addr: SocketAddr) -> Result<()> {
         spawn(async move {
             let mut recv_result;
             let mut send_result;
+            let mut head;
             let mut buf = Buf::new_zeroed(1024, 8);
 
             loop {
@@ -74,8 +75,9 @@ async fn server(addr: SocketAddr) -> Result<()> {
                         bincode::serialize_into(&mut writer, &res)?;
                         let nbytes: usize = writer.position().numeric_cast();
 
-                        (send_result, buf) = conn.send(buf, nbytes).await;
+                        (send_result, head) = conn.send(buf.head(nbytes)).await;
                         send_result?;
+                        buf = head.into_inner();
                     }
                     Message::Pong { .. } => {}
                     Message::Exit => break,
@@ -91,6 +93,7 @@ async fn client(addr: SocketAddr) -> Result<()> {
     let conn = Arc::new(RdmaConnection::connect(addr).await?);
     let mut recv_result;
     let mut send_result;
+    let mut head;
     let mut buf = Buf::new_zeroed(1024, 8);
 
     for i in 1..=64 {
@@ -102,8 +105,9 @@ async fn client(addr: SocketAddr) -> Result<()> {
         bincode::serialize_into(&mut writer, &req)?;
         let nbytes: usize = writer.position().numeric_cast();
 
-        (send_result, buf) = conn.send(buf, nbytes).await;
+        (send_result, head) = conn.send(buf.head(nbytes)).await;
         send_result?;
+        buf = head.into_inner();
 
         (recv_result, buf) = conn.recv(buf).await;
         let nread = recv_result?;
@@ -119,7 +123,7 @@ async fn client(addr: SocketAddr) -> Result<()> {
         bincode::serialize_into(&mut writer, &req)?;
         let nbytes: usize = writer.position().numeric_cast();
 
-        (send_result, _) = conn.send(buf, nbytes).await;
+        (send_result, _) = conn.send(buf.head(nbytes)).await;
         send_result?;
     }
 

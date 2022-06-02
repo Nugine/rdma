@@ -57,6 +57,10 @@ impl Buf {
         let len = self.mr.length();
         unsafe { slice::from_raw_parts_mut(base, len) }
     }
+
+    pub fn head(self, len: usize) -> Head<Self> {
+        Head::new(self, len)
+    }
 }
 
 impl Drop for Buf {
@@ -88,3 +92,40 @@ unsafe impl LocalAccess for Buf {
 
 unsafe impl LocalReadAccess for Buf {}
 unsafe impl LocalWriteAccess for Buf {}
+
+pub struct Head<T> {
+    inner: T,
+    len: usize,
+}
+
+impl<T: LocalAccess> Head<T> {
+    pub fn new(inner: T, len: usize) -> Self {
+        assert!(len <= inner.length());
+        Self { inner, len }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+unsafe impl<T: LocalAccess> LocalAccess for Head<T> {
+    fn addr_u64(&self) -> u64 {
+        self.inner.addr_u64()
+    }
+
+    fn length(&self) -> usize {
+        self.len
+    }
+
+    fn lkey(&self) -> u32 {
+        self.inner.lkey()
+    }
+}
+
+unsafe impl<T: LocalReadAccess> LocalReadAccess for Head<T> {}
+unsafe impl<T: LocalWriteAccess> LocalWriteAccess for Head<T> {}
