@@ -128,3 +128,29 @@ where
         ptr.write(sge);
     }
 }
+
+pub trait IntoScatterList {
+    type Output: ScatterList;
+    fn into_scatter_list(self) -> Self::Output;
+}
+
+impl<T: ScatterList> IntoScatterList for T {
+    type Output = T;
+
+    fn into_scatter_list(self) -> Self::Output {
+        self
+    }
+}
+
+pub trait IntoGatherList {
+    type Output: GatherList;
+    fn into_gather_list(self) -> Self::Output;
+}
+
+impl<T: GatherList> IntoGatherList for T {
+    type Output = T;
+
+    fn into_gather_list(self) -> Self::Output {
+        self
+    }
+}

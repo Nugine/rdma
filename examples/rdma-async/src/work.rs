@@ -1,4 +1,4 @@
-use crate::{GatherList, ScatterList};
+use crate::{GatherList, IntoGatherList, IntoScatterList, ScatterList};
 
 use rdma::qp::QueuePair;
 use rdma::wc::{WorkCompletion, WorkCompletionError};
@@ -238,14 +238,15 @@ where
     }
 }
 
-pub async fn send<T>(qp: QueuePair, slist: T) -> (Result<()>, T)
+pub async fn send<I>(qp: QueuePair, slist: I) -> (Result<()>, I::Output)
 where
-    T: ScatterList + Send + Sync,
+    I: IntoScatterList,
+    I::Output: Send + Sync,
 {
     let work = Work::new(
         qp,
         OpSend {
-            slist,
+            slist: slist.into_scatter_list(),
             res: Ok(()),
             status: u32::MAX,
         },
@@ -262,14 +263,15 @@ where
     (Ok(()), op.slist)
 }
 
-pub async fn recv<T>(qp: QueuePair, glist: T) -> (Result<usize>, T)
+pub async fn recv<I>(qp: QueuePair, glist: I) -> (Result<usize>, I::Output)
 where
-    T: GatherList + Send + Sync,
+    I: IntoGatherList,
+    I::Output: Send + Sync,
 {
     let work = Work::new(
         qp,
         OpRecv {
-            glist,
+            glist: glist.into_gather_list(),
             res: Ok(()),
             status: u32::MAX,
             byte_len: 0,

@@ -1,5 +1,5 @@
 use crate::driver::RdmaDriver;
-use crate::{work, GatherList, ScatterList};
+use crate::{work, IntoGatherList, IntoScatterList};
 
 use rdma::ah::{AddressHandle, GlobalRoute};
 use rdma::ctx::Context;
@@ -181,16 +181,18 @@ impl RdmaConnection {
         Ok(Self { qp })
     }
 
-    pub async fn send<T>(&self, slist: T) -> (Result<()>, T)
+    pub async fn send<I>(&self, slist: I) -> (Result<()>, I::Output)
     where
-        T: ScatterList + Send + Sync,
+        I: IntoScatterList,
+        I::Output: Send + Sync,
     {
         work::send(self.qp.clone(), slist).await
     }
 
-    pub async fn recv<T>(&self, glist: T) -> (Result<usize>, T)
+    pub async fn recv<I>(&self, glist: I) -> (Result<usize>, I::Output)
     where
-        T: GatherList + Send + Sync,
+        I: IntoGatherList,
+        I::Output: Send + Sync,
     {
         work::recv(self.qp.clone(), glist).await
     }
