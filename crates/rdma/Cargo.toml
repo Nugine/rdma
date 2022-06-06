@@ -25,7 +25,7 @@ serde = { version = "1.0.137", optional = true, features = ["derive"] }
 const-str = "0.3.1"
 
 [build-dependencies]
-bindgen = "0.59.2"
+bindgen = "0.60.0"
 pkg-config = "0.3.25"
 
 [package.metadata.docs.rs]

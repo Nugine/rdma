@@ -72,8 +72,7 @@ fn main() {
             .default_enum_style("consts".parse().unwrap())
             .size_t_is_usize(true)
             .rustfmt_bindings(true)
-            .rust_target("1.47".parse().unwrap())
-            .layout_tests(false); // FIXME: turn on layout tests when bindgen releases the next version
+            .rust_target("1.47".parse().unwrap());
 
         {
             let mut cmd_flags = bindings.command_line_flags();
