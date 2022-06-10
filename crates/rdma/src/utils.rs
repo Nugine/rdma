@@ -64,30 +64,43 @@ pub fn u32_as_c_uint(val: u32) -> c_uint {
 }
 
 /// Calculates the offset of the specified field from the start of the named struct.
-/// This macro is impossible to be const until `feature(const_ptr_offset_from)` is stable.
 macro_rules! offset_of {
-    ($ty: path, $field: tt) => {{
-        // ensure the type is a named struct
-        // ensure the field exists and is accessible
-        #[allow(clippy::unneeded_field_pattern)]
-        let $ty { $field: _, .. };
-
-        let uninit = <::core::mem::MaybeUninit<$ty>>::uninit(); // const since 1.36
-
-        let base_ptr: *const $ty = uninit.as_ptr(); // const since 1.59
-
-        #[allow(unused_unsafe)]
-        // SAFETY: get raw ptr
-        let field_ptr = unsafe { ::core::ptr::addr_of!((*base_ptr).$field) }; // since 1.51
-
-        // // the const version requires feature(const_ptr_offset_from)
-        // // https://github.com/rust-lang/rust/issues/92980
-        // #[allow(unused_unsafe)]
-        // unsafe { (field_ptr as *const u8).offset_from(base_ptr as *const u8) as usize }
-
-        #[allow(clippy::integer_arithmetic, clippy::as_conversions)]
+    ($ty: path, $field: tt) => {
+        // // feature(inline_const)
+        // const
         {
-            (field_ptr as usize) - (base_ptr as usize)
+            #[allow(
+                unused_unsafe,
+                clippy::as_conversions,
+                clippy::unneeded_field_pattern,
+                clippy::undocumented_unsafe_blocks,
+                clippy::integer_arithmetic
+            )]
+            unsafe {
+                use ::core::mem::MaybeUninit;
+                use ::core::primitive::usize;
+                use ::core::ptr;
+
+                // ensure the type is a named struct
+                // ensure the field exists and is accessible
+                let $ty { $field: _, .. };
+
+                // const since 1.36
+                let uninit: MaybeUninit<$ty> = MaybeUninit::uninit();
+
+                // const since 1.59
+                let base_ptr: *const $ty = uninit.as_ptr();
+
+                // stable since 1.51
+                let field_ptr: *const _ = ptr::addr_of!((*base_ptr).$field);
+
+                // // feature(const_ptr_offset_from)
+                // let base_addr = base_ptr.cast::<u8>();
+                // let field_addr = field_ptr.cast::<u8>();
+                // field_addr.offset_from(base_addr) as usize
+
+                (field_ptr as usize) - (base_ptr as usize)
+            }
         }
-    }};
+    };
 }

@@ -16,11 +16,11 @@ use std::mem;
 use std::ops::Not;
 use std::ptr;
 
-macro_rules! container_of {
+macro_rules! container_of_mut {
     ($ptr: expr, $ty: path, $field: tt) => {{
-        let ptr = $ptr;
-        let offset = offset_of!($ty, $field);
-        ptr.cast::<u8>().sub(offset).cast::<$ty>()
+        use ::core::primitive::u8;
+        let ptr: *mut _ = $ptr;
+        ptr.cast::<u8>().sub(offset_of!($ty, $field)).cast::<$ty>()
     }};
 }
 
@@ -56,10 +56,10 @@ pub fn ibv_cq_ex_to_cq(cq: *mut ibv_cq_ex) -> *mut ibv_cq {
 
 #[inline]
 unsafe fn verbs_get_ctx(ctx: *mut ibv_context) -> *mut verbs_context {
-    if (*ctx).abi_compat != mem::transmute::<_, *mut c_void>(usize::MAX) {
+    if (*ctx).abi_compat != usize::MAX as *mut c_void {
         return ptr::null_mut();
     }
-    container_of!(ctx, verbs_context, context)
+    container_of_mut!(ctx, verbs_context, context)
 }
 
 macro_rules! verbs_get_ctx_op {
@@ -289,7 +289,7 @@ pub unsafe fn ibv_reg_mr(
     if access & _RS_IBV_ACCESS_OPTIONAL_RANGE == 0 {
         return compat::ibv_reg_mr(pd, addr, length, access);
     }
-    ibv_reg_mr_iova2(pd, addr, length, addr as usize as _, access)
+    ibv_reg_mr_iova2(pd, addr, length, addr as usize as u64, access)
 }
 
 #[inline]
