@@ -33,6 +33,16 @@ impl WorkCompletion {
     pub fn opcode(&self) -> Opcode {
         Opcode::from_c_uint(self.0.opcode)
     }
+
+    #[inline]
+    #[must_use]
+    pub fn imm_data(&self) -> Option<u32> {
+        // SAFETY: tagged union
+        unsafe {
+            let has_imm = self.0.wc_flags & C::IBV_WC_WITH_IMM != 0;
+            has_imm.then(|| self.0.__bindgen_anon_1.imm_data)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
