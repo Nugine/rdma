@@ -3,7 +3,7 @@ use rdma::wr::Sge;
 
 /// # Safety
 /// TODO
-pub unsafe trait LocalAccess {
+pub unsafe trait LocalAccess: 'static {
     fn addr_u64(&self) -> u64;
     fn length(&self) -> usize;
     fn lkey(&self) -> u32;
@@ -17,33 +17,9 @@ pub unsafe trait LocalReadAccess: LocalAccess {}
 /// TODO
 pub unsafe trait LocalWriteAccess: LocalAccess {}
 
-pub trait IntoLocalReadAccess {
-    type Output: LocalReadAccess;
-    fn into_local_read_access(self) -> Self::Output;
-}
-
-impl<T: LocalReadAccess> IntoLocalReadAccess for T {
-    type Output = Self;
-    fn into_local_read_access(self) -> Self::Output {
-        self
-    }
-}
-
-pub trait IntoLocalWriteAccess {
-    type Output: LocalWriteAccess;
-    fn into_local_write_access(self) -> Self::Output;
-}
-
-impl<T: LocalWriteAccess> IntoLocalWriteAccess for T {
-    type Output = Self;
-    fn into_local_write_access(self) -> Self::Output {
-        self
-    }
-}
-
 /// # Safety
 /// TODO
-pub unsafe trait RemoteAccess {
+pub unsafe trait RemoteAccess: 'static {
     fn addr_u64(&self) -> u64;
     fn length(&self) -> usize;
     fn rkey(&self) -> u32;
@@ -56,30 +32,6 @@ pub unsafe trait RemoteReadAccess: RemoteAccess {}
 /// # Safety
 /// TODO
 pub unsafe trait RemoteWriteAccess: RemoteAccess {}
-
-pub trait IntoRemoteReadAccess {
-    type Output: RemoteReadAccess;
-    fn into_remote_read_access(self) -> Self::Output;
-}
-
-pub trait IntoRemoteWriteAccess {
-    type Output: RemoteWriteAccess;
-    fn into_remote_write_access(self) -> Self::Output;
-}
-
-impl<T: RemoteReadAccess> IntoRemoteReadAccess for T {
-    type Output = Self;
-    fn into_remote_read_access(self) -> Self::Output {
-        self
-    }
-}
-
-impl<T: RemoteWriteAccess> IntoRemoteWriteAccess for T {
-    type Output = Self;
-    fn into_remote_write_access(self) -> Self::Output {
-        self
-    }
-}
 
 /// # Safety
 /// TODO
@@ -174,29 +126,5 @@ where
             lkey: self.lkey(),
         };
         ptr.write(sge);
-    }
-}
-
-pub trait IntoScatterList {
-    type Output: ScatterList;
-    fn into_scatter_list(self) -> Self::Output;
-}
-
-impl<T: ScatterList> IntoScatterList for T {
-    type Output = Self;
-    fn into_scatter_list(self) -> Self::Output {
-        self
-    }
-}
-
-pub trait IntoGatherList {
-    type Output: GatherList;
-    fn into_gather_list(self) -> Self::Output;
-}
-
-impl<T: GatherList> IntoGatherList for T {
-    type Output = Self;
-    fn into_gather_list(self) -> Self::Output {
-        self
     }
 }

@@ -1,5 +1,4 @@
 use crate::driver::RdmaDriver;
-use crate::{IntoLocalReadAccess, IntoLocalWriteAccess};
 use crate::{LocalAccess, LocalReadAccess, LocalWriteAccess};
 
 use rdma::mr::{AccessFlags, MemoryRegion};
@@ -156,22 +155,6 @@ impl RwBuf {
 
     pub fn write(&self) -> WriteRwBuf {
         WriteRwBuf(self.0.clone(), self.0.write_arc())
-    }
-}
-
-impl IntoLocalReadAccess for &RwBuf {
-    type Output = ReadRwBuf;
-
-    fn into_local_read_access(self) -> Self::Output {
-        self.read()
-    }
-}
-
-impl IntoLocalWriteAccess for &RwBuf {
-    type Output = WriteRwBuf;
-
-    fn into_local_write_access(self) -> Self::Output {
-        self.write()
     }
 }
 
