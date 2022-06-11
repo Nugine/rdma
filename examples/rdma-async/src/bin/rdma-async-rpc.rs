@@ -61,7 +61,7 @@ async fn server(addr: SocketAddr) -> Result<()> {
 
             loop {
                 (recv_result, buf) = conn.recv(buf).await;
-                let nread = recv_result?;
+                let (nread, _) = recv_result?;
 
                 let req: Message = bincode::deserialize(&buf.as_slice()[..nread])?;
 
@@ -75,7 +75,7 @@ async fn server(addr: SocketAddr) -> Result<()> {
                         bincode::serialize_into(&mut writer, &res)?;
                         let nbytes: usize = writer.position().numeric_cast();
 
-                        (send_result, head) = conn.send(buf.head(nbytes)).await;
+                        (send_result, head) = conn.send(buf.head(nbytes), None).await;
                         send_result?;
                         buf = head.into_inner();
                     }
@@ -105,12 +105,12 @@ async fn client(addr: SocketAddr) -> Result<()> {
         bincode::serialize_into(&mut writer, &req)?;
         let nbytes: usize = writer.position().numeric_cast();
 
-        (send_result, head) = conn.send(buf.head(nbytes)).await;
+        (send_result, head) = conn.send(buf.head(nbytes), None).await;
         send_result?;
         buf = head.into_inner();
 
         (recv_result, buf) = conn.recv(buf).await;
-        let nread = recv_result?;
+        let (nread, _) = recv_result?;
 
         let res: Message = bincode::deserialize(&buf.as_slice()[..nread])?;
         info!("client received: {:?}", res);
@@ -123,7 +123,7 @@ async fn client(addr: SocketAddr) -> Result<()> {
         bincode::serialize_into(&mut writer, &req)?;
         let nbytes: usize = writer.position().numeric_cast();
 
-        (send_result, _) = conn.send(buf.head(nbytes)).await;
+        (send_result, _) = conn.send(buf.head(nbytes), None).await;
         send_result?;
     }
 

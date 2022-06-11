@@ -1,6 +1,6 @@
 use crate::sg_list::SgList;
-use crate::{GatherList, IntoGatherList, IntoScatterList, ScatterList};
-use crate::{IntoRemoteReadAccess, IntoRemoteWriteAccess, RemoteReadAccess, RemoteWriteAccess};
+use crate::{GatherList, ScatterList};
+use crate::{RemoteReadAccess, RemoteWriteAccess};
 
 use rdma::qp::QueuePair;
 use rdma::wc::{WorkCompletion, WorkCompletionError};
@@ -21,8 +21,10 @@ use scopeguard::ScopeGuard;
 /// # Safety
 /// TODO
 unsafe trait Operation: Send + Sync + Unpin {
-    fn submit(&mut self, qp: &QueuePair, id: u64) -> bool;
+    type Output;
+    fn submit(&mut self, qp: &QueuePair, id: u64) -> io::Result<()>;
     fn complete(&mut self, wc: &WorkCompletion);
+    fn output(self, result: io::Result<u32>) -> Self::Output;
 }
 
 struct Work<T> {
@@ -39,6 +41,7 @@ struct State<T> {
     step: Step,
     waker: Option<Waker>,
     qp: QueuePair,
+    status: u32,
     op: ManuallyDrop<T>,
 }
 
@@ -60,6 +63,7 @@ impl<T: Operation> Work<T> {
                     step: Step::Pending,
                     waker: None,
                     qp,
+                    status: u32::MAX,
                     op: ManuallyDrop::new(op),
                 }),
             }),
@@ -73,6 +77,7 @@ impl<T: Operation> Work<T> {
             let mut guard: _ = inner.state.lock();
             let state = &mut *guard;
             assert_eq!(state.step, Step::Running);
+            state.status = wc.status();
             state.op.complete(wc);
             state.step = Step::Completed;
             if let Some(ref waker) = state.waker {
@@ -88,7 +93,7 @@ pub unsafe fn complete(wc: &WorkCompletion) {
 }
 
 impl<T: Operation> Future for Work<T> {
-    type Output = T;
+    type Output = T::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut guard = self.inner.state.lock();
@@ -101,21 +106,22 @@ impl<T: Operation> Future for Work<T> {
 
                 let id: u64 = (inner_ptr as usize).numeric_cast();
 
-                if state.op.submit(&state.qp, id) {
-                    // SAFETY: state refcount
-                    ScopeGuard::into_inner(arc_guard);
+                let res = state.op.submit(&state.qp, id);
+                match res {
+                    Ok(()) => {
+                        ScopeGuard::into_inner(arc_guard);
 
-                    state.step = Step::Running;
-                    state.waker = Some(cx.waker().clone());
-                    Poll::Pending
-                } else {
-                    // SAFETY: state refcount
-                    drop(arc_guard);
+                        state.step = Step::Running;
+                        state.waker = Some(cx.waker().clone());
+                        Poll::Pending
+                    }
+                    Err(err) => {
+                        drop(arc_guard);
 
-                    state.step = Step::Invalid;
-                    // SAFETY: managed state machine
-                    let op = unsafe { ManuallyDrop::take(&mut state.op) };
-                    Poll::Ready(op)
+                        state.step = Step::Invalid;
+                        let op = unsafe { ManuallyDrop::take(&mut state.op) };
+                        Poll::Ready(op.output(Err(err)))
+                    }
                 }
             }
             Step::Running => {
@@ -125,9 +131,8 @@ impl<T: Operation> Future for Work<T> {
             }
             Step::Completed => {
                 state.step = Step::Invalid;
-                // SAFETY: managed state machine
                 let op = unsafe { ManuallyDrop::take(&mut state.op) };
-                Poll::Ready(op)
+                Poll::Ready(op.output(Ok(state.status)))
             }
             Step::Invalid => panic!("the future is completed or failed"),
             Step::Poisoned => panic!("the future is poisoned"),
@@ -173,15 +178,11 @@ unsafe fn submit_single_send(
     qp: &QueuePair,
     id: u64,
     sg_list: SgList<'_>,
-    res: &mut io::Result<()>,
     f: &mut dyn FnMut(&mut SendRequest),
-) -> bool {
+) -> io::Result<()> {
     let cq = qp.send_cq().expect("the qp can not post send");
 
-    *res = cq.req_notify_all();
-    if res.is_err() {
-        return false;
-    }
+    cq.req_notify_all()?;
 
     convert_sglist(sg_list, |sg_list| {
         let mut send_wr = SendRequest::zeroed();
@@ -191,53 +192,40 @@ unsafe fn submit_single_send(
             .send_flags(wr::SendFlags::SIGNALED);
         f(&mut send_wr);
 
-        *res = qp.post_send(&send_wr);
-        res.is_ok()
+        qp.post_send(&send_wr)
     })
 }
 
-unsafe fn submit_single_recv(
-    qp: &QueuePair,
-    id: u64,
-    sg_list: SgList<'_>,
-    res: &mut io::Result<()>,
-) -> bool {
+unsafe fn submit_single_recv(qp: &QueuePair, id: u64, sg_list: SgList<'_>) -> io::Result<()> {
     let cq = qp.recv_cq().expect("the qp can not post recv");
 
-    *res = cq.req_notify_all();
-    if res.is_err() {
-        return false;
-    }
+    cq.req_notify_all()?;
 
     convert_sglist(sg_list, |sg_list| {
         let mut recv_wr = RecvRequest::zeroed();
         recv_wr.id(id).sg_list(sg_list);
 
-        *res = qp.post_recv(&recv_wr);
-        res.is_ok()
+        qp.post_recv(&recv_wr)
     })
 }
 
-fn op_return_value<F, G>(
-    res: io::Result<()>,
-    status: u32,
+fn return_value<F, G>(
+    result: io::Result<u32>,
     f: impl FnOnce() -> F,
     g: impl FnOnce() -> G,
 ) -> (Result<F>, G) {
-    if let Err(err) = res {
-        return (Err(err.into()), g());
+    match result {
+        Ok(status) => match WorkCompletionError::result(status) {
+            Ok(()) => (Ok(f()), g()),
+            Err(err) => (Err(err.into()), g()),
+        },
+        Err(err) => (Err(err.into()), g()),
     }
-    if let Err(err) = WorkCompletionError::result(status) {
-        return (Err(err.into()), g());
-    }
-    (Ok(f()), g())
 }
 
 struct OpSend<T> {
     slist: T,
     imm: Option<u32>,
-    res: io::Result<()>,
-    status: u32,
 }
 
 impl<T> Unpin for OpSend<T> {}
@@ -247,11 +235,12 @@ unsafe impl<T> Operation for OpSend<T>
 where
     T: ScatterList + Send + Sync,
 {
-    fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
+    type Output = (Result<()>, T);
+
+    fn submit(&mut self, qp: &QueuePair, id: u64) -> io::Result<()> {
         unsafe {
             let sg_list = SgList::from_slist(&self.slist);
-            let res: _ = &mut self.res;
-            submit_single_send(qp, id, sg_list, res, &mut |send_wr| {
+            submit_single_send(qp, id, sg_list, &mut |send_wr| {
                 match self.imm {
                     None => send_wr.opcode(wr::Opcode::Send),
                     Some(imm) => send_wr.opcode(wr::Opcode::SendWithImm).imm_data(imm),
@@ -260,15 +249,15 @@ where
         }
     }
 
-    fn complete(&mut self, wc: &WorkCompletion) {
-        self.status = wc.status();
+    fn complete(&mut self, _: &WorkCompletion) {}
+
+    fn output(self, result: io::Result<u32>) -> Self::Output {
+        return_value(result, || (), || self.slist)
     }
 }
 
 struct OpRecv<T> {
     glist: T,
-    res: io::Result<()>,
-    status: u32,
     byte_len: u32,
     imm_data: Option<u32>,
 }
@@ -280,70 +269,53 @@ unsafe impl<T> Operation for OpRecv<T>
 where
     T: GatherList + Send + Sync,
 {
-    fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
+    type Output = (Result<(usize, Option<u32>)>, T);
+
+    fn submit(&mut self, qp: &QueuePair, id: u64) -> io::Result<()> {
         unsafe {
             let sg_list = SgList::from_glist(&self.glist);
-            let res = &mut self.res;
-            submit_single_recv(qp, id, sg_list, res)
+            submit_single_recv(qp, id, sg_list)
         }
     }
 
     fn complete(&mut self, wc: &WorkCompletion) {
-        self.status = wc.status();
         self.byte_len = wc.byte_len();
         self.imm_data = wc.imm_data();
     }
+
+    fn output(self, result: io::Result<u32>) -> Self::Output {
+        return_value(
+            result,
+            || (self.byte_len.numeric_cast(), self.imm_data),
+            || self.glist,
+        )
+    }
 }
 
-pub async fn send<T>(qp: QueuePair, slist: T, imm: Option<u32>) -> (Result<()>, T::Output)
+pub fn send<T>(qp: QueuePair, slist: T, imm: Option<u32>) -> impl Future<Output = (Result<()>, T)>
 where
-    T: IntoScatterList,
-    T::Output: Send + Sync,
+    T: ScatterList + Send + Sync,
 {
-    let slist: _ = slist.into_scatter_list();
-    let work: _ = Work::new(
-        qp,
-        OpSend {
-            slist,
-            imm,
-            res: Ok(()),
-            status: u32::MAX,
-        },
-    );
-    let op: _ = work.await;
-    op_return_value(op.res, op.status, || (), || op.slist)
+    Work::new(qp, OpSend { slist, imm })
 }
 
-pub async fn recv<T>(qp: QueuePair, glist: T) -> (Result<usize>, (T::Output, Option<u32>))
+pub fn recv<T>(qp: QueuePair, glist: T) -> impl Future<Output = (Result<(usize, Option<u32>)>, T)>
 where
-    T: IntoGatherList,
-    T::Output: Send + Sync,
+    T: GatherList + Send + Sync,
 {
-    let glist: _ = glist.into_gather_list();
-    let work: _ = Work::new(
+    Work::new(
         qp,
         OpRecv {
             glist,
-            res: Ok(()),
-            status: u32::MAX,
             byte_len: 0,
             imm_data: None,
         },
-    );
-    let op = work.await;
-    op_return_value(
-        op.res,
-        op.status,
-        || (op.byte_len.numeric_cast()),
-        || (op.glist, op.imm_data),
     )
 }
 
 pub struct OpWrite<T, U> {
     slist: T,
     remote: U,
-    res: io::Result<()>,
-    status: u32,
 }
 
 impl<T, U> Unpin for OpWrite<T, U> {}
@@ -354,11 +326,12 @@ where
     T: ScatterList + Send + Sync,
     U: RemoteWriteAccess + Send + Sync,
 {
-    fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
+    type Output = (Result<()>, (T, U));
+
+    fn submit(&mut self, qp: &QueuePair, id: u64) -> io::Result<()> {
         unsafe {
             let sg_list = SgList::from_slist(&self.slist);
-            let res: _ = &mut self.res;
-            submit_single_send(qp, id, sg_list, res, &mut |send_wr| {
+            submit_single_send(qp, id, sg_list, &mut |send_wr| {
                 send_wr
                     .opcode(wr::Opcode::Write)
                     .rdma_remote_addr(self.remote.addr_u64())
@@ -367,16 +340,16 @@ where
         }
     }
 
-    fn complete(&mut self, wc: &WorkCompletion) {
-        self.status = wc.status();
+    fn complete(&mut self, _: &WorkCompletion) {}
+
+    fn output(self, result: io::Result<u32>) -> Self::Output {
+        return_value(result, || (), || (self.slist, self.remote))
     }
 }
 
 pub struct OpRead<T, U> {
     glist: T,
     remote: U,
-    res: io::Result<()>,
-    status: u32,
     byte_len: u32,
 }
 
@@ -388,11 +361,12 @@ where
     T: GatherList + Send + Sync,
     U: RemoteReadAccess + Send + Sync,
 {
-    fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
+    type Output = (Result<usize>, (T, U));
+
+    fn submit(&mut self, qp: &QueuePair, id: u64) -> io::Result<()> {
         unsafe {
             let sg_list = SgList::from_glist(&self.glist);
-            let res: _ = &mut self.res;
-            submit_single_send(qp, id, sg_list, res, &mut |send_wr| {
+            submit_single_send(qp, id, sg_list, &mut |send_wr| {
                 send_wr
                     .opcode(wr::Opcode::Read)
                     .rdma_remote_addr(self.remote.addr_u64())
@@ -402,61 +376,41 @@ where
     }
 
     fn complete(&mut self, wc: &WorkCompletion) {
-        self.status = wc.status();
         self.byte_len = wc.byte_len();
+    }
+
+    fn output(self, result: io::Result<u32>) -> Self::Output {
+        return_value(
+            result,
+            || self.byte_len.numeric_cast(),
+            || (self.glist, self.remote),
+        )
     }
 }
 
-pub async fn write<T, U>(qp: QueuePair, slist: T, remote: U) -> (Result<()>, (T::Output, U::Output))
+pub fn write<T, U>(qp: QueuePair, slist: T, remote: U) -> impl Future<Output = (Result<()>, (T, U))>
 where
-    T: IntoScatterList,
-    T::Output: Send + Sync,
-    U: IntoRemoteWriteAccess,
-    U::Output: Send + Sync,
+    T: ScatterList + Send + Sync,
+    U: RemoteWriteAccess + Send + Sync,
 {
-    let slist: _ = slist.into_scatter_list();
-    let remote: _ = remote.into_remote_write_access();
-    let work: _ = Work::new(
-        qp,
-        OpWrite {
-            slist,
-            remote,
-            res: Ok(()),
-            status: u32::MAX,
-        },
-    );
-    let op: _ = work.await;
-    op_return_value(op.res, op.status, || (), || (op.slist, op.remote))
+    Work::new(qp, OpWrite { slist, remote })
 }
 
-pub async fn read<T, U>(
+pub fn read<T, U>(
     qp: QueuePair,
     glist: T,
     remote: U,
-) -> (Result<usize>, (T::Output, U::Output))
+) -> impl Future<Output = (Result<usize>, (T, U))>
 where
-    T: IntoGatherList,
-    T::Output: Send + Sync,
-    U: IntoRemoteReadAccess,
-    U::Output: Send + Sync,
+    T: GatherList + Send + Sync,
+    U: RemoteReadAccess + Send + Sync,
 {
-    let glist: _ = glist.into_gather_list();
-    let remote: _ = remote.into_remote_read_access();
-    let work: _ = Work::new(
+    Work::new(
         qp,
         OpRead {
             glist,
             remote,
-            res: Ok(()),
-            status: u32::MAX,
             byte_len: 0,
         },
-    );
-    let op: _ = work.await;
-    op_return_value(
-        op.res,
-        op.status,
-        || (op.byte_len.numeric_cast()),
-        || (op.glist, op.remote),
     )
 }

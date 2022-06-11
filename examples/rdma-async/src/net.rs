@@ -181,21 +181,24 @@ impl RdmaConnection {
         Ok(Self { qp })
     }
 
-    pub async fn send<T>(&self, slist: T) -> (Result<()>, T::Output)
+    pub async fn send<T>(&self, slist: T, imm: Option<u32>) -> (Result<()>, T::Output)
     where
         T: IntoScatterList,
         T::Output: Send + Sync,
     {
-        work::send(self.qp.clone(), slist, None).await
+        let qp: _ = self.qp.clone();
+        let slist: _ = slist.into_scatter_list();
+        work::send(qp, slist, imm).await
     }
 
-    pub async fn recv<T>(&self, glist: T) -> (Result<usize>, T::Output)
+    pub async fn recv<T>(&self, glist: T) -> (Result<(usize, Option<u32>)>, T::Output)
     where
         T: IntoGatherList,
         T::Output: Send + Sync,
     {
-        let (res, (glist, _)) = work::recv(self.qp.clone(), glist).await;
-        (res, glist)
+        let qp: _ = self.qp.clone();
+        let glist: _ = glist.into_gather_list();
+        work::recv(qp, glist).await
     }
 
     pub async fn write<T, U>(&self, slist: T, remote: U) -> (Result<()>, (T::Output, U::Output))
@@ -205,7 +208,10 @@ impl RdmaConnection {
         U: IntoRemoteWriteAccess,
         U::Output: Send + Sync,
     {
-        work::write(self.qp.clone(), slist, remote).await
+        let qp: _ = self.qp.clone();
+        let slist: _ = slist.into_scatter_list();
+        let remote: _ = remote.into_remote_write_access();
+        work::write(qp, slist, remote).await
     }
 
     pub async fn read<T, U>(&self, glist: T, remote: U) -> (Result<usize>, (T::Output, U::Output))
@@ -215,7 +221,10 @@ impl RdmaConnection {
         U: IntoRemoteReadAccess,
         U::Output: Send + Sync,
     {
-        work::read(self.qp.clone(), glist, remote).await
+        let qp: _ = self.qp.clone();
+        let glist: _ = glist.into_gather_list();
+        let remote: _ = remote.into_remote_read_access();
+        work::read(qp, glist, remote).await
     }
 }
 
