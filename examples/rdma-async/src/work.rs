@@ -1,20 +1,21 @@
+use crate::sg_list::SgList;
 use crate::{GatherList, IntoGatherList, IntoScatterList, ScatterList};
 
 use rdma::qp::QueuePair;
 use rdma::wc::{WorkCompletion, WorkCompletionError};
-use rdma::wr::{self, Sge};
-use scopeguard::ScopeGuard;
+use rdma::wr::{self, RecvRequest, SendRequest, Sge};
 
 use std::future::Future;
-use std::io;
-use std::mem::{self, ManuallyDrop};
+use std::mem::{self, ManuallyDrop, MaybeUninit};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
+use std::{io, slice};
 
 use anyhow::Result;
 use numeric_cast::NumericCast;
 use parking_lot::Mutex;
+use scopeguard::ScopeGuard;
 
 /// # Safety
 /// TODO
@@ -146,6 +147,76 @@ impl<T> Drop for State<T> {
     }
 }
 
+unsafe fn convert_sglist<R>(sg_list: SgList<'_>, f: impl FnOnce(&[Sge]) -> R) -> R {
+    const N: usize = 4;
+    let mut arr_sg_list;
+    let mut vec_sg_list;
+    let sg_list: &[Sge] = {
+        let len = sg_list.length();
+        if len <= N {
+            arr_sg_list = MaybeUninit::<[Sge; N]>::uninit();
+            let ptr = arr_sg_list.as_mut_ptr().cast();
+            sg_list.fill(ptr);
+            slice::from_raw_parts(ptr, len)
+        } else {
+            vec_sg_list = Vec::with_capacity(len);
+            sg_list.fill(vec_sg_list.as_mut_ptr());
+            vec_sg_list.set_len(len);
+            vec_sg_list.as_slice()
+        }
+    };
+    f(sg_list)
+}
+
+unsafe fn submit_single_send(
+    qp: &QueuePair,
+    id: u64,
+    sg_list: SgList<'_>,
+    res: &mut io::Result<()>,
+    f: &mut dyn FnMut(&mut SendRequest),
+) -> bool {
+    let cq = qp.send_cq().expect("the qp can not post send");
+
+    *res = cq.req_notify_all();
+    if res.is_err() {
+        return false;
+    }
+
+    convert_sglist(sg_list, |sg_list| {
+        let mut send_wr = SendRequest::zeroed();
+        send_wr
+            .id(id)
+            .sg_list(sg_list)
+            .send_flags(wr::SendFlags::SIGNALED);
+        f(&mut send_wr);
+
+        *res = qp.post_send(&send_wr);
+        res.is_ok()
+    })
+}
+
+unsafe fn submit_single_recv(
+    qp: &QueuePair,
+    id: u64,
+    sg_list: SgList<'_>,
+    res: &mut io::Result<()>,
+) -> bool {
+    let cq = qp.recv_cq().expect("the qp can not post recv");
+
+    *res = cq.req_notify_all();
+    if res.is_err() {
+        return false;
+    }
+
+    convert_sglist(sg_list, |sg_list| {
+        let mut recv_wr = RecvRequest::zeroed();
+        recv_wr.id(id).sg_list(sg_list);
+
+        *res = qp.post_recv(&recv_wr);
+        res.is_ok()
+    })
+}
+
 struct OpSend<T> {
     slist: T,
     res: io::Result<()>,
@@ -160,32 +231,13 @@ where
     T: ScatterList + Send + Sync,
 {
     fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
-        let cq = qp.send_cq().expect("the qp can not post send");
-
-        self.res = cq.req_notify_all();
-        if self.res.is_err() {
-            return false;
+        unsafe {
+            let sg_list = SgList::from_slist(&self.slist);
+            let res: _ = &mut self.res;
+            submit_single_send(qp, id, sg_list, res, &mut |send_wr| {
+                send_wr.opcode(wr::Opcode::Send);
+            })
         }
-
-        // TODO: small vector optimization
-        let sg_list = unsafe {
-            let len = self.slist.length();
-            let mut v: Vec<Sge> = Vec::with_capacity(len);
-            self.slist.fill(v.as_mut_ptr());
-            v.set_len(len);
-            v
-        };
-
-        let mut send_wr = wr::SendRequest::zeroed();
-        send_wr
-            .id(id)
-            .sg_list(&sg_list)
-            .opcode(wr::Opcode::Send)
-            .send_flags(wr::SendFlags::SIGNALED);
-
-        // SAFETY: managed state machine
-        self.res = unsafe { qp.post_send(&send_wr) };
-        self.res.is_ok()
     }
 
     fn complete(&mut self, wc: &WorkCompletion) {
@@ -208,28 +260,11 @@ where
     T: GatherList + Send + Sync,
 {
     fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
-        let cq = qp.recv_cq().expect("the qp can not post recv");
-
-        self.res = cq.req_notify_all();
-        if self.res.is_err() {
-            return false;
+        unsafe {
+            let sg_list = SgList::from_glist(&self.glist);
+            let res = &mut self.res;
+            submit_single_recv(qp, id, sg_list, res)
         }
-
-        // TODO: small vector optimization
-        let sg_list = unsafe {
-            let len = self.glist.length();
-            let mut v: Vec<Sge> = Vec::with_capacity(len);
-            self.glist.fill(v.as_mut_ptr());
-            v.set_len(len);
-            v
-        };
-
-        let mut recv_wr = wr::RecvRequest::zeroed();
-        recv_wr.id(id).sg_list(&sg_list);
-
-        // SAFETY: managed state machine
-        self.res = unsafe { qp.post_recv(&recv_wr) };
-        self.res.is_ok()
     }
 
     fn complete(&mut self, wc: &WorkCompletion) {
