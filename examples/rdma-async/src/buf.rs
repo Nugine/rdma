@@ -1,4 +1,5 @@
 use crate::driver::RdmaDriver;
+use crate::{IntoLocalReadAccess, IntoLocalWriteAccess};
 use crate::{LocalAccess, LocalReadAccess, LocalWriteAccess};
 
 use rdma::mr::{AccessFlags, MemoryRegion};
@@ -6,7 +7,10 @@ use rdma::mr::{AccessFlags, MemoryRegion};
 use std::alloc::{alloc_zeroed, dealloc, handle_alloc_error, Layout};
 use std::mem::ManuallyDrop;
 use std::slice;
+use std::sync::Arc;
 
+use parking_lot::lock_api::{ArcRwLockReadGuard, ArcRwLockWriteGuard};
+use parking_lot::{RawRwLock, RwLock};
 use scopeguard::guard;
 
 pub struct Buf {
@@ -133,3 +137,73 @@ unsafe impl<T: LocalAccess> LocalAccess for Head<T> {
 
 unsafe impl<T: LocalReadAccess> LocalReadAccess for Head<T> {}
 unsafe impl<T: LocalWriteAccess> LocalWriteAccess for Head<T> {}
+
+#[derive(Clone)]
+pub struct RwBuf(Arc<RwLock<Buf>>);
+
+pub struct ReadRwBuf(Arc<RwLock<Buf>>, ArcRwLockReadGuard<RawRwLock, Buf>);
+pub struct WriteRwBuf(Arc<RwLock<Buf>>, ArcRwLockWriteGuard<RawRwLock, Buf>);
+
+impl RwBuf {
+    pub fn new_zeroed(len: usize, align: usize) -> Self {
+        let buf = Buf::new_zeroed(len, align);
+        Self(Arc::new(RwLock::new(buf)))
+    }
+
+    pub fn read(&self) -> ReadRwBuf {
+        ReadRwBuf(self.0.clone(), self.0.read_arc())
+    }
+
+    pub fn write(&self) -> WriteRwBuf {
+        WriteRwBuf(self.0.clone(), self.0.write_arc())
+    }
+}
+
+impl IntoLocalReadAccess for &RwBuf {
+    type Output = ReadRwBuf;
+
+    fn into_local_read_access(self) -> Self::Output {
+        self.read()
+    }
+}
+
+impl IntoLocalWriteAccess for &RwBuf {
+    type Output = WriteRwBuf;
+
+    fn into_local_write_access(self) -> Self::Output {
+        self.write()
+    }
+}
+
+unsafe impl LocalAccess for ReadRwBuf {
+    fn addr_u64(&self) -> u64 {
+        self.1.addr_u64()
+    }
+
+    fn length(&self) -> usize {
+        self.1.length()
+    }
+
+    fn lkey(&self) -> u32 {
+        self.1.lkey()
+    }
+}
+
+unsafe impl LocalReadAccess for ReadRwBuf {}
+
+unsafe impl LocalAccess for WriteRwBuf {
+    fn addr_u64(&self) -> u64 {
+        self.1.addr_u64()
+    }
+
+    fn length(&self) -> usize {
+        self.1.length()
+    }
+
+    fn lkey(&self) -> u32 {
+        self.1.lkey()
+    }
+}
+
+unsafe impl LocalReadAccess for WriteRwBuf {}
+unsafe impl LocalWriteAccess for WriteRwBuf {}
