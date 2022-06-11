@@ -99,6 +99,18 @@ impl SendRequest {
         self.0.wr.ud.remote_qkey = remote_qkey;
         self
     }
+
+    #[inline]
+    pub fn rdma_remote_addr(&mut self, remote_addr: u64) -> &mut Self {
+        self.0.wr.rdma.remote_addr = remote_addr;
+        self
+    }
+
+    #[inline]
+    pub fn rdma_rkey(&mut self, rkey: u32) -> &mut Self {
+        self.0.wr.rdma.rkey = rkey;
+        self
+    }
 }
 
 impl RecvRequest {
