@@ -33,6 +33,32 @@ pub unsafe trait RemoteReadAccess: RemoteAccess {}
 /// TODO
 pub unsafe trait RemoteWriteAccess: RemoteAccess {}
 
+pub trait IntoRemoteReadAccess {
+    type Output: RemoteReadAccess;
+    fn into_remote_read_access(self) -> Self::Output;
+}
+
+pub trait IntoRemoteWriteAccess {
+    type Output: RemoteWriteAccess;
+    fn into_remote_write_access(self) -> Self::Output;
+}
+
+impl<T: RemoteReadAccess> IntoRemoteReadAccess for T {
+    type Output = Self;
+
+    fn into_remote_read_access(self) -> Self::Output {
+        self
+    }
+}
+
+impl<T: RemoteWriteAccess> IntoRemoteWriteAccess for T {
+    type Output = Self;
+
+    fn into_remote_write_access(self) -> Self::Output {
+        self
+    }
+}
+
 /// # Safety
 /// TODO
 pub unsafe trait ScatterList {
@@ -135,7 +161,7 @@ pub trait IntoScatterList {
 }
 
 impl<T: ScatterList> IntoScatterList for T {
-    type Output = T;
+    type Output = Self;
 
     fn into_scatter_list(self) -> Self::Output {
         self
@@ -148,7 +174,7 @@ pub trait IntoGatherList {
 }
 
 impl<T: GatherList> IntoGatherList for T {
-    type Output = T;
+    type Output = Self;
 
     fn into_gather_list(self) -> Self::Output {
         self

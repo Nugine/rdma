@@ -1,5 +1,6 @@
 use crate::sg_list::SgList;
 use crate::{GatherList, IntoGatherList, IntoScatterList, ScatterList};
+use crate::{IntoRemoteReadAccess, IntoRemoteWriteAccess, RemoteReadAccess, RemoteWriteAccess};
 
 use rdma::qp::QueuePair;
 use rdma::wc::{WorkCompletion, WorkCompletionError};
@@ -217,6 +218,21 @@ unsafe fn submit_single_recv(
     })
 }
 
+fn op_return_value<F, G>(
+    res: io::Result<()>,
+    status: u32,
+    f: impl FnOnce() -> F,
+    g: impl FnOnce() -> G,
+) -> (Result<F>, G) {
+    if let Err(err) = res {
+        return (Err(err.into()), g());
+    }
+    if let Err(err) = WorkCompletionError::result(status) {
+        return (Err(err.into()), g());
+    }
+    (Ok(f()), g())
+}
+
 struct OpSend<T> {
     slist: T,
     res: io::Result<()>,
@@ -273,53 +289,166 @@ where
     }
 }
 
-pub async fn send<I>(qp: QueuePair, slist: I) -> (Result<()>, I::Output)
+pub async fn send<T>(qp: QueuePair, slist: T) -> (Result<()>, T::Output)
 where
-    I: IntoScatterList,
-    I::Output: Send + Sync,
+    T: IntoScatterList,
+    T::Output: Send + Sync,
 {
-    let work = Work::new(
+    let slist: _ = slist.into_scatter_list();
+    let work: _ = Work::new(
         qp,
         OpSend {
-            slist: slist.into_scatter_list(),
+            slist,
             res: Ok(()),
             status: u32::MAX,
         },
     );
-
-    let op = work.await;
-
-    if let Err(err) = op.res {
-        return (Err(err.into()), op.slist);
-    }
-    if let Err(err) = WorkCompletionError::result(op.status) {
-        return (Err(err.into()), op.slist);
-    }
-    (Ok(()), op.slist)
+    let op: _ = work.await;
+    op_return_value(op.res, op.status, || (), || op.slist)
 }
 
-pub async fn recv<I>(qp: QueuePair, glist: I) -> (Result<usize>, I::Output)
+pub async fn recv<T>(qp: QueuePair, glist: T) -> (Result<usize>, T::Output)
 where
-    I: IntoGatherList,
-    I::Output: Send + Sync,
+    T: IntoGatherList,
+    T::Output: Send + Sync,
 {
-    let work = Work::new(
+    let glist: _ = glist.into_gather_list();
+    let work: _ = Work::new(
         qp,
         OpRecv {
-            glist: glist.into_gather_list(),
+            glist,
             res: Ok(()),
             status: u32::MAX,
             byte_len: 0,
         },
     );
-
     let op = work.await;
+    op_return_value(
+        op.res,
+        op.status,
+        || (op.byte_len.numeric_cast()),
+        || op.glist,
+    )
+}
 
-    if let Err(err) = op.res {
-        return (Err(err.into()), op.glist);
+pub struct OpWrite<T, U> {
+    slist: T,
+    remote: U,
+    res: io::Result<()>,
+    status: u32,
+}
+
+impl<T, U> Unpin for OpWrite<T, U> {}
+
+/// SAFETY: operation type
+unsafe impl<T, U> Operation for OpWrite<T, U>
+where
+    T: ScatterList + Send + Sync,
+    U: RemoteWriteAccess + Send + Sync,
+{
+    fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
+        unsafe {
+            let sg_list = SgList::from_slist(&self.slist);
+            let res: _ = &mut self.res;
+            submit_single_send(qp, id, sg_list, res, &mut |send_wr| {
+                send_wr
+                    .opcode(wr::Opcode::Write)
+                    .rdma_remote_addr(self.remote.addr_u64())
+                    .rdma_rkey(self.remote.rkey());
+            })
+        }
     }
-    if let Err(err) = WorkCompletionError::result(op.status) {
-        return (Err(err.into()), op.glist);
+
+    fn complete(&mut self, wc: &WorkCompletion) {
+        self.status = wc.status();
     }
-    (Ok(op.byte_len.numeric_cast()), op.glist)
+}
+
+pub struct OpRead<T, U> {
+    glist: T,
+    remote: U,
+    res: io::Result<()>,
+    status: u32,
+    byte_len: u32,
+}
+
+impl<T, U> Unpin for OpRead<T, U> {}
+
+/// SAFETY: operation type
+unsafe impl<T, U> Operation for OpRead<T, U>
+where
+    T: GatherList + Send + Sync,
+    U: RemoteReadAccess + Send + Sync,
+{
+    fn submit(&mut self, qp: &QueuePair, id: u64) -> bool {
+        unsafe {
+            let sg_list = SgList::from_glist(&self.glist);
+            let res: _ = &mut self.res;
+            submit_single_send(qp, id, sg_list, res, &mut |send_wr| {
+                send_wr
+                    .opcode(wr::Opcode::Read)
+                    .rdma_remote_addr(self.remote.addr_u64())
+                    .rdma_rkey(self.remote.rkey());
+            })
+        }
+    }
+
+    fn complete(&mut self, wc: &WorkCompletion) {
+        self.status = wc.status();
+        self.byte_len = wc.byte_len();
+    }
+}
+
+pub async fn write<T, U>(qp: QueuePair, slist: T, remote: U) -> (Result<()>, (T::Output, U::Output))
+where
+    T: IntoScatterList,
+    T::Output: Send + Sync,
+    U: IntoRemoteWriteAccess,
+    U::Output: Send + Sync,
+{
+    let slist: _ = slist.into_scatter_list();
+    let remote: _ = remote.into_remote_write_access();
+    let work: _ = Work::new(
+        qp,
+        OpWrite {
+            slist,
+            remote,
+            res: Ok(()),
+            status: u32::MAX,
+        },
+    );
+    let op: _ = work.await;
+    op_return_value(op.res, op.status, || (), || (op.slist, op.remote))
+}
+
+pub async fn read<T, U>(
+    qp: QueuePair,
+    glist: T,
+    remote: U,
+) -> (Result<usize>, (T::Output, U::Output))
+where
+    T: IntoGatherList,
+    T::Output: Send + Sync,
+    U: IntoRemoteReadAccess,
+    U::Output: Send + Sync,
+{
+    let glist: _ = glist.into_gather_list();
+    let remote: _ = remote.into_remote_read_access();
+    let work: _ = Work::new(
+        qp,
+        OpRead {
+            glist,
+            remote,
+            res: Ok(()),
+            status: u32::MAX,
+            byte_len: 0,
+        },
+    );
+    let op: _ = work.await;
+    op_return_value(
+        op.res,
+        op.status,
+        || (op.byte_len.numeric_cast()),
+        || (op.glist, op.remote),
+    )
 }

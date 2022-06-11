@@ -1,5 +1,5 @@
 use crate::driver::RdmaDriver;
-use crate::{work, IntoGatherList, IntoScatterList};
+use crate::{work, IntoGatherList, IntoRemoteReadAccess, IntoRemoteWriteAccess, IntoScatterList};
 
 use rdma::ah::{AddressHandle, GlobalRoute};
 use rdma::ctx::Context;
@@ -181,20 +181,40 @@ impl RdmaConnection {
         Ok(Self { qp })
     }
 
-    pub async fn send<I>(&self, slist: I) -> (Result<()>, I::Output)
+    pub async fn send<T>(&self, slist: T) -> (Result<()>, T::Output)
     where
-        I: IntoScatterList,
-        I::Output: Send + Sync,
+        T: IntoScatterList,
+        T::Output: Send + Sync,
     {
         work::send(self.qp.clone(), slist).await
     }
 
-    pub async fn recv<I>(&self, glist: I) -> (Result<usize>, I::Output)
+    pub async fn recv<T>(&self, glist: T) -> (Result<usize>, T::Output)
     where
-        I: IntoGatherList,
-        I::Output: Send + Sync,
+        T: IntoGatherList,
+        T::Output: Send + Sync,
     {
         work::recv(self.qp.clone(), glist).await
+    }
+
+    pub async fn write<T, U>(&self, slist: T, remote: U) -> (Result<()>, (T::Output, U::Output))
+    where
+        T: IntoScatterList,
+        T::Output: Send + Sync,
+        U: IntoRemoteWriteAccess,
+        U::Output: Send + Sync,
+    {
+        work::write(self.qp.clone(), slist, remote).await
+    }
+
+    pub async fn read<T, U>(&self, glist: T, remote: U) -> (Result<usize>, (T::Output, U::Output))
+    where
+        T: IntoGatherList,
+        T::Output: Send + Sync,
+        U: IntoRemoteReadAccess,
+        U::Output: Send + Sync,
+    {
+        work::read(self.qp.clone(), glist, remote).await
     }
 }
 
