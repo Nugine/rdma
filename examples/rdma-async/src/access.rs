@@ -1,5 +1,9 @@
-use numeric_cast::NumericCast;
 use rdma::wr::Sge;
+
+use std::mem::MaybeUninit;
+use std::slice;
+
+use numeric_cast::NumericCast;
 
 /// # Safety
 /// TODO
@@ -127,4 +131,16 @@ where
         };
         ptr.write(sge);
     }
+}
+
+pub fn as_slice<T: LocalReadAccess>(ra: &T) -> &[u8] {
+    let data = ra.addr_u64() as usize as *mut u8;
+    let len = ra.length();
+    unsafe { slice::from_raw_parts(data, len) }
+}
+
+pub fn as_mut_slice<T: LocalWriteAccess>(wa: &mut T) -> &mut [MaybeUninit<u8>] {
+    let data = wa.addr_u64() as usize as *mut MaybeUninit<u8>;
+    let len = wa.length();
+    unsafe { slice::from_raw_parts_mut(data, len) }
 }
