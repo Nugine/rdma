@@ -186,7 +186,7 @@ impl RdmaConnection {
         T: IntoScatterList,
         T::Output: Send + Sync,
     {
-        work::send(self.qp.clone(), slist).await
+        work::send(self.qp.clone(), slist, None).await
     }
 
     pub async fn recv<T>(&self, glist: T) -> (Result<usize>, T::Output)
@@ -194,7 +194,8 @@ impl RdmaConnection {
         T: IntoGatherList,
         T::Output: Send + Sync,
     {
-        work::recv(self.qp.clone(), glist).await
+        let (res, (glist, _)) = work::recv(self.qp.clone(), glist).await;
+        (res, glist)
     }
 
     pub async fn write<T, U>(&self, slist: T, remote: U) -> (Result<()>, (T::Output, U::Output))

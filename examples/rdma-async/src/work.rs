@@ -235,6 +235,7 @@ fn op_return_value<F, G>(
 
 struct OpSend<T> {
     slist: T,
+    imm: Option<u32>,
     res: io::Result<()>,
     status: u32,
 }
@@ -251,7 +252,10 @@ where
             let sg_list = SgList::from_slist(&self.slist);
             let res: _ = &mut self.res;
             submit_single_send(qp, id, sg_list, res, &mut |send_wr| {
-                send_wr.opcode(wr::Opcode::Send);
+                match self.imm {
+                    None => send_wr.opcode(wr::Opcode::Send),
+                    Some(imm) => send_wr.opcode(wr::Opcode::SendWithImm).imm_data(imm),
+                };
             })
         }
     }
@@ -266,6 +270,7 @@ struct OpRecv<T> {
     res: io::Result<()>,
     status: u32,
     byte_len: u32,
+    imm_data: Option<u32>,
 }
 
 impl<T> Unpin for OpRecv<T> {}
@@ -286,10 +291,11 @@ where
     fn complete(&mut self, wc: &WorkCompletion) {
         self.status = wc.status();
         self.byte_len = wc.byte_len();
+        self.imm_data = wc.imm_data();
     }
 }
 
-pub async fn send<T>(qp: QueuePair, slist: T) -> (Result<()>, T::Output)
+pub async fn send<T>(qp: QueuePair, slist: T, imm: Option<u32>) -> (Result<()>, T::Output)
 where
     T: IntoScatterList,
     T::Output: Send + Sync,
@@ -299,6 +305,7 @@ where
         qp,
         OpSend {
             slist,
+            imm,
             res: Ok(()),
             status: u32::MAX,
         },
@@ -307,7 +314,7 @@ where
     op_return_value(op.res, op.status, || (), || op.slist)
 }
 
-pub async fn recv<T>(qp: QueuePair, glist: T) -> (Result<usize>, T::Output)
+pub async fn recv<T>(qp: QueuePair, glist: T) -> (Result<usize>, (T::Output, Option<u32>))
 where
     T: IntoGatherList,
     T::Output: Send + Sync,
@@ -320,6 +327,7 @@ where
             res: Ok(()),
             status: u32::MAX,
             byte_len: 0,
+            imm_data: None,
         },
     );
     let op = work.await;
@@ -327,7 +335,7 @@ where
         op.res,
         op.status,
         || (op.byte_len.numeric_cast()),
-        || op.glist,
+        || (op.glist, op.imm_data),
     )
 }
 
