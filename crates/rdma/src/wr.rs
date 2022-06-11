@@ -111,6 +111,12 @@ impl SendRequest {
         self.0.wr.rdma.rkey = rkey;
         self
     }
+
+    #[inline]
+    pub fn imm_data(&mut self, imm_data: u32) -> &mut Self {
+        self.0.__bindgen_anon_1.imm_data = imm_data;
+        self
+    }
 }
 
 impl RecvRequest {
