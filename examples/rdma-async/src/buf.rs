@@ -108,6 +108,10 @@ impl<T: LocalAccess> Head<T> {
         self.len
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     pub fn into_inner(self) -> T {
         self.inner
     }

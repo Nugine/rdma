@@ -17,6 +17,30 @@ pub unsafe trait LocalReadAccess: LocalAccess {}
 /// TODO
 pub unsafe trait LocalWriteAccess: LocalAccess {}
 
+pub trait IntoLocalReadAccess {
+    type Output: LocalReadAccess;
+    fn into_local_read_access(self) -> Self::Output;
+}
+
+impl<T: LocalReadAccess> IntoLocalReadAccess for T {
+    type Output = Self;
+    fn into_local_read_access(self) -> Self::Output {
+        self
+    }
+}
+
+pub trait IntoLocalWriteAccess {
+    type Output: LocalWriteAccess;
+    fn into_local_write_access(self) -> Self::Output;
+}
+
+impl<T: LocalWriteAccess> IntoLocalWriteAccess for T {
+    type Output = Self;
+    fn into_local_write_access(self) -> Self::Output {
+        self
+    }
+}
+
 /// # Safety
 /// TODO
 pub unsafe trait RemoteAccess {
@@ -45,7 +69,6 @@ pub trait IntoRemoteWriteAccess {
 
 impl<T: RemoteReadAccess> IntoRemoteReadAccess for T {
     type Output = Self;
-
     fn into_remote_read_access(self) -> Self::Output {
         self
     }
@@ -53,7 +76,6 @@ impl<T: RemoteReadAccess> IntoRemoteReadAccess for T {
 
 impl<T: RemoteWriteAccess> IntoRemoteWriteAccess for T {
     type Output = Self;
-
     fn into_remote_write_access(self) -> Self::Output {
         self
     }
@@ -162,7 +184,6 @@ pub trait IntoScatterList {
 
 impl<T: ScatterList> IntoScatterList for T {
     type Output = Self;
-
     fn into_scatter_list(self) -> Self::Output {
         self
     }
@@ -175,7 +196,6 @@ pub trait IntoGatherList {
 
 impl<T: GatherList> IntoGatherList for T {
     type Output = Self;
-
     fn into_gather_list(self) -> Self::Output {
         self
     }
