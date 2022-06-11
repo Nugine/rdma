@@ -20,7 +20,7 @@ use scopeguard::ScopeGuard;
 
 /// # Safety
 /// TODO
-unsafe trait Operation: Send + Sync + Unpin {
+unsafe trait Operation: Send {
     type Output;
     fn submit(&mut self, qp: &QueuePair, id: u64) -> io::Result<()>;
     fn complete(&mut self, wc: &WorkCompletion);
@@ -30,6 +30,8 @@ unsafe trait Operation: Send + Sync + Unpin {
 struct Work<T> {
     inner: Arc<WorkInner<T>>,
 }
+
+impl<T> Unpin for Work<T> {}
 
 #[repr(C)]
 struct WorkInner<T> {
@@ -228,12 +230,10 @@ struct OpSend<T> {
     imm: Option<u32>,
 }
 
-impl<T> Unpin for OpSend<T> {}
-
 /// SAFETY: operation type
 unsafe impl<T> Operation for OpSend<T>
 where
-    T: ScatterList + Send + Sync,
+    T: ScatterList + Send,
 {
     type Output = (Result<()>, T);
 
@@ -262,12 +262,10 @@ struct OpRecv<T> {
     imm_data: Option<u32>,
 }
 
-impl<T> Unpin for OpRecv<T> {}
-
 /// SAFETY: operation type
 unsafe impl<T> Operation for OpRecv<T>
 where
-    T: GatherList + Send + Sync,
+    T: GatherList + Send,
 {
     type Output = (Result<(usize, Option<u32>)>, T);
 
@@ -294,14 +292,14 @@ where
 
 pub fn send<T>(qp: QueuePair, slist: T, imm: Option<u32>) -> impl Future<Output = (Result<()>, T)>
 where
-    T: ScatterList + Send + Sync,
+    T: ScatterList + Send,
 {
     Work::new(qp, OpSend { slist, imm })
 }
 
 pub fn recv<T>(qp: QueuePair, glist: T) -> impl Future<Output = (Result<(usize, Option<u32>)>, T)>
 where
-    T: GatherList + Send + Sync,
+    T: GatherList + Send,
 {
     Work::new(
         qp,
@@ -318,13 +316,11 @@ pub struct OpWrite<T, U> {
     remote: U,
 }
 
-impl<T, U> Unpin for OpWrite<T, U> {}
-
 /// SAFETY: operation type
 unsafe impl<T, U> Operation for OpWrite<T, U>
 where
-    T: ScatterList + Send + Sync,
-    U: RemoteWriteAccess + Send + Sync,
+    T: ScatterList + Send,
+    U: RemoteWriteAccess + Send,
 {
     type Output = (Result<()>, (T, U));
 
@@ -353,13 +349,11 @@ pub struct OpRead<T, U> {
     byte_len: u32,
 }
 
-impl<T, U> Unpin for OpRead<T, U> {}
-
 /// SAFETY: operation type
 unsafe impl<T, U> Operation for OpRead<T, U>
 where
-    T: GatherList + Send + Sync,
-    U: RemoteReadAccess + Send + Sync,
+    T: GatherList + Send,
+    U: RemoteReadAccess + Send,
 {
     type Output = (Result<usize>, (T, U));
 
@@ -390,8 +384,8 @@ where
 
 pub fn write<T, U>(qp: QueuePair, slist: T, remote: U) -> impl Future<Output = (Result<()>, (T, U))>
 where
-    T: ScatterList + Send + Sync,
-    U: RemoteWriteAccess + Send + Sync,
+    T: ScatterList + Send,
+    U: RemoteWriteAccess + Send,
 {
     Work::new(qp, OpWrite { slist, remote })
 }
@@ -402,8 +396,8 @@ pub fn read<T, U>(
     remote: U,
 ) -> impl Future<Output = (Result<usize>, (T, U))>
 where
-    T: GatherList + Send + Sync,
-    U: RemoteReadAccess + Send + Sync,
+    T: GatherList + Send,
+    U: RemoteReadAccess + Send,
 {
     Work::new(
         qp,
