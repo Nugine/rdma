@@ -25,17 +25,13 @@ where
 {
     set_errno(0);
     let p = f();
-    match NonNull::new(p) {
-        Some(p) => Ok(p),
-        None => {
-            let errno = get_errno();
-            Err(if errno == 0 {
-                custom_error(e())
-            } else {
-                from_errno(errno)
-            })
+    NonNull::new(p).ok_or_else(|| {
+        let errno = get_errno();
+        if errno != 0 {
+            return from_errno(errno);
         }
-    }
+        custom_error(e())
+    })
 }
 
 pub fn set_errno(errno: i32) {

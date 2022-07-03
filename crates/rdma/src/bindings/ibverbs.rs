@@ -212,7 +212,7 @@ pub unsafe fn ibv_dealloc_mw(mw: *mut ibv_mw) -> c_int {
 pub unsafe fn ibv_bind_mw(qp: *mut ibv_qp, mw: *mut ibv_mw, mw_bind: *mut ibv_mw_bind) -> c_int {
     {
         let mw = &*mw;
-        if (*mw).type_ != IBV_MW_TYPE_1 {
+        if mw.type_ != IBV_MW_TYPE_1 {
             return EINVAL;
         }
 
