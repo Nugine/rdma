@@ -151,8 +151,8 @@ async fn exchange_dest(stream: &mut TcpStream, local_dest: &Dest) -> Result<Dest
         stream.read_exact(&mut msg_size).await?;
         msg_buf.clear();
         msg_buf.resize(msg_size[0].into(), 0);
-        stream.read_exact(&mut *msg_buf).await?;
-        let dest = bincode::deserialize::<Dest>(&*msg_buf)?;
+        stream.read_exact(msg_buf.as_mut_slice()).await?;
+        let dest = bincode::deserialize::<Dest>(msg_buf.as_slice())?;
         Ok(dest)
     }
 }
