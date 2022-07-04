@@ -136,7 +136,7 @@ fn gid_to_hex<R>(gid: &Gid, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -> R
     let ans = {
         // SAFETY: uninit project
         let bytes = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), 32) };
-        let dst = hex_simd::OutBuf::from_uninit_mut(bytes);
+        let dst = hex_simd::OutBuf::uninit(bytes);
         let result = hex_simd::encode_as_str(src, dst, case);
         // SAFETY: the encoding never fails
         unsafe { result.unwrap_unchecked() }
