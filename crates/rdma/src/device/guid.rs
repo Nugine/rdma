@@ -1,27 +1,24 @@
-use crate::bindings as C;
-
 use std::mem::MaybeUninit;
-use std::{fmt, mem, slice};
+use std::{fmt, slice};
 
 /// A RDMA device guid
 #[derive(Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct Guid(C::__be64);
+#[repr(C, align(8))]
+pub struct Guid([u8; 8]);
 
 impl Guid {
     /// Constructs a Guid from network bytes.
     #[inline]
     #[must_use]
     pub fn from_bytes(bytes: [u8; 8]) -> Self {
-        Self(u64::from_ne_bytes(bytes))
+        Self(bytes)
     }
 
     /// Returns the bytes of GUID in network byte order.
     #[inline]
     #[must_use]
     pub fn as_bytes(&self) -> &[u8; 8] {
-        // SAFETY: transparent be64
-        unsafe { mem::transmute(self) }
+        &self.0
     }
 }
 
@@ -33,7 +30,6 @@ impl fmt::Debug for Guid {
 }
 
 fn guid_to_hex<R>(guid: Guid, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -> R) -> R {
-    // SAFETY: same repr
     let src: &[u8; 8] = guid.as_bytes();
     let mut buf: MaybeUninit<[u8; 16]> = MaybeUninit::uninit();
     let ans = {
