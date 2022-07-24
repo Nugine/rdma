@@ -18,7 +18,9 @@
     clippy::exhaustive_enums,
     clippy::exhaustive_structs,
     clippy::unseparated_literal_suffix,
-    clippy::mod_module_files
+    clippy::mod_module_files,
+    clippy::std_instead_of_core,
+    clippy::std_instead_of_alloc
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO

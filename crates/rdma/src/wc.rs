@@ -40,7 +40,7 @@ impl WorkCompletion {
         // SAFETY: tagged union
         unsafe {
             let has_imm = self.0.wc_flags & C::IBV_WC_WITH_IMM != 0;
-            has_imm.then(|| self.0.__bindgen_anon_1.imm_data)
+            has_imm.then_some(self.0.__bindgen_anon_1.imm_data)
         }
     }
 }
