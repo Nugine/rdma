@@ -7,7 +7,8 @@
     clippy::integer_arithmetic,
     clippy::inline_always,
     clippy::shadow_same,
-    clippy::missing_safety_doc
+    clippy::missing_safety_doc,
+    clippy::arithmetic
 )]
 
 use super::*;

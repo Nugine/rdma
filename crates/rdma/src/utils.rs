@@ -74,7 +74,8 @@ macro_rules! offset_of {
                 clippy::as_conversions,
                 clippy::unneeded_field_pattern,
                 clippy::undocumented_unsafe_blocks,
-                clippy::integer_arithmetic
+                clippy::integer_arithmetic,
+                clippy::arithmetic
             )]
             unsafe {
                 use ::core::mem::MaybeUninit;
