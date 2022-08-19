@@ -36,16 +36,10 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: rdma
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-      - name: Rust components
-        run: |
-          rustup component add rustfmt
-          rustup component add clippy
-      - name: Rust check
+          components: rustfmt, clippy
+      - name: Rust CI
         run: |
           set -x
           pushd rdma
