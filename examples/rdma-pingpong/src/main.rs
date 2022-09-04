@@ -392,7 +392,7 @@ fn exchange_dest_over_tcp(server: Option<IpAddr>, port: u16, local_dest: &Dest) 
             // client side
             let server_addr = SocketAddr::from((ip, port));
             info!("connecting to {}", server_addr);
-            TcpStream::connect(&server_addr)?
+            TcpStream::connect(server_addr)?
         }
         None => {
             // server side
