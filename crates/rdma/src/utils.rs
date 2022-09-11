@@ -32,11 +32,7 @@ pub const fn c_uint_to_u32(x: c_uint) -> u32 {
 }
 
 pub const fn bool_to_c_int(b: bool) -> c_int {
-    if b {
-        1
-    } else {
-        0
-    }
+    b as c_int
 }
 
 pub fn ptr_to_addr<T>(p: *const T) -> usize {
@@ -75,7 +71,7 @@ macro_rules! offset_of {
                 clippy::unneeded_field_pattern,
                 clippy::undocumented_unsafe_blocks,
                 clippy::integer_arithmetic,
-                clippy::arithmetic
+                clippy::arithmetic_side_effects
             )]
             unsafe {
                 use ::core::mem::MaybeUninit;
