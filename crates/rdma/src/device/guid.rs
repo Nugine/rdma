@@ -25,7 +25,7 @@ impl Guid {
 impl fmt::Debug for Guid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Guid({:x})", self)
+        write!(f, "Guid({self:x})")
     }
 }
 
@@ -74,9 +74,9 @@ mod tests {
         const GUID_HEX: &str = "26418cfffe021df9";
         let guid = Guid::from_bytes(hex!(GUID_HEX));
 
-        let debug = format!("{:?}", guid);
-        let lower_hex = format!("{:x}", guid);
-        let upper_hex = format!("{:X}", guid);
+        let debug = format!("{guid:?}");
+        let lower_hex = format!("{guid:x}");
+        let upper_hex = format!("{guid:X}");
 
         assert_eq!(debug, format!("Guid({GUID_HEX})"));
         assert_eq!(lower_hex, GUID_HEX);

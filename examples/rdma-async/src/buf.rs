@@ -69,7 +69,7 @@ impl Buf {
 impl Drop for Buf {
     fn drop(&mut self) {
         let ptr = self.mr.addr_ptr();
-        let len = self.mr.length() as usize;
+        let len = self.mr.length();
         let align = self.mr.metadata().align;
         unsafe {
             ManuallyDrop::drop(&mut self.mr);

@@ -111,7 +111,7 @@ impl Eq for Gid {}
 impl fmt::Debug for Gid {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Gid({:x})", self)
+        write!(f, "Gid({self:x})")
     }
 }
 
@@ -198,9 +198,9 @@ mod tests {
         const GID_HEX: &str = "fe800000000000009acd3cec6916fc65";
         let gid = Gid::from_bytes(hex!(GID_HEX));
 
-        let debug = format!("{:?}", gid);
-        let lower_hex = format!("{:x}", gid);
-        let upper_hex = format!("{:X}", gid);
+        let debug = format!("{gid:?}");
+        let lower_hex = format!("{gid:x}");
+        let upper_hex = format!("{gid:X}");
 
         assert_eq!(debug, format!("Gid({GID_HEX})"));
         assert_eq!(lower_hex, GID_HEX);

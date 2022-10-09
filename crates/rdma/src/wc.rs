@@ -138,7 +138,7 @@ impl WorkCompletionError {
         u32_as_c_uint(self as u32)
     }
 
-    #[allow(clippy::as_conversions)]
+    #[allow(clippy::as_conversions, clippy::unnecessary_cast)]
     fn from_c_uint(val: c_uint) -> Self {
         let last = Self::TagMatchingRndvIncomplete.to_c_uint();
         assert!((1..=last).contains(&val), "unknown work completion status");

@@ -111,7 +111,7 @@ pub enum Mtu {
 }
 
 impl Mtu {
-    #[allow(clippy::as_conversions)]
+    #[allow(clippy::as_conversions, clippy::unnecessary_cast)]
     fn from_c_uint(val: c_uint) -> Self {
         assert!((1..6).contains(&val), "unexpected MTU value");
         // SAFETY: continuous integer enum

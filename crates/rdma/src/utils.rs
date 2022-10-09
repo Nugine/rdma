@@ -26,6 +26,7 @@ pub unsafe fn box_assume_init<T>(b: Box<MaybeUninit<T>>) -> Box<T> {
     Box::from_raw(ptr)
 }
 
+#[allow(clippy::unnecessary_cast)]
 pub const fn c_uint_to_u32(x: c_uint) -> u32 {
     assert!(!(mem::size_of::<c_uint>() > mem::size_of::<u32>() && x > u32::MAX as c_uint));
     x as u32
