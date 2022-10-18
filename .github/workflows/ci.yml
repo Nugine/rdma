@@ -15,7 +15,7 @@ jobs:
   develop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           repository: linux-rdma/rdma-core
           path: rdma-core
@@ -34,7 +34,7 @@ jobs:
           popd
           pkg-config --modversion libibverbs
           pkg-config --modversion librdmacm
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: rdma
       - uses: dtolnay/rust-toolchain@nightly

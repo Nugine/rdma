@@ -191,7 +191,7 @@ mod tests {
 
     use crate::utils::require_send_sync;
 
-    use const_str::hex_bytes as hex;
+    use const_str::hex;
 
     #[test]
     fn gid_fmt() {

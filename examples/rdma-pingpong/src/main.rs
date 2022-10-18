@@ -55,7 +55,7 @@ struct Args {
     #[clap(short = 'n', long, default_value = "1000")]
     iters: usize,
 
-    #[clap(parse(try_from_str = parse_qp_type))]
+    #[clap(value_parser = parse_qp_type)]
     qp_type: QueuePairType,
 
     server: Option<IpAddr>,
