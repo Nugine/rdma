@@ -20,7 +20,8 @@
     clippy::unseparated_literal_suffix,
     clippy::mod_module_files,
     clippy::std_instead_of_core,
-    clippy::std_instead_of_alloc
+    clippy::std_instead_of_alloc,
+    clippy::missing_trait_methods
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
