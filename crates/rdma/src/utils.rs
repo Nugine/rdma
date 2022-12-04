@@ -61,44 +61,41 @@ pub fn u32_as_c_uint(val: u32) -> c_uint {
 }
 
 /// Calculates the offset of the specified field from the start of the named struct.
+#[macro_export]
 macro_rules! offset_of {
-    ($ty: path, $field: tt) => {
-        // // feature(inline_const)
-        // const
-        {
-            #[allow(
-                unused_unsafe,
-                clippy::as_conversions,
-                clippy::unneeded_field_pattern,
-                clippy::undocumented_unsafe_blocks,
-                clippy::integer_arithmetic,
-                clippy::arithmetic_side_effects
-            )]
-            unsafe {
-                use ::core::mem::MaybeUninit;
-                use ::core::primitive::usize;
-                use ::core::ptr;
+    ($ty: path, $field: tt) => {{
+        use ::core::mem::MaybeUninit;
+        use ::core::primitive::{u8, usize};
+        use ::core::ptr;
 
-                // ensure the type is a named struct
-                // ensure the field exists and is accessible
-                let $ty { $field: _, .. };
+        #[allow(
+            unused_unsafe,
+            clippy::as_conversions,
+            clippy::unneeded_field_pattern,
+            clippy::undocumented_unsafe_blocks
+        )]
+        const OFFSET: usize = unsafe {
+            // ensure the type is a named struct
+            // ensure the field exists and is accessible
+            let $ty { $field: _, .. };
 
-                // const since 1.36
-                let uninit: MaybeUninit<$ty> = MaybeUninit::uninit();
+            // const since 1.36
+            let uninit: MaybeUninit<$ty> = MaybeUninit::uninit();
 
-                // const since 1.59
-                let base_ptr: *const $ty = uninit.as_ptr();
+            // const since 1.59
+            // UnsafeCell needs feature(const_refs_to_cell)
+            let base_ptr: *const $ty = uninit.as_ptr();
 
-                // stable since 1.51
-                let field_ptr: *const _ = ptr::addr_of!((*base_ptr).$field);
+            // stable since 1.51
+            let field_ptr: *const _ = ptr::addr_of!((*base_ptr).$field);
 
-                // // feature(const_ptr_offset_from)
-                // let base_addr = base_ptr.cast::<u8>();
-                // let field_addr = field_ptr.cast::<u8>();
-                // field_addr.offset_from(base_addr) as usize
+            // const since 1.38
+            let base_addr = base_ptr.cast::<u8>();
+            let field_addr = field_ptr.cast::<u8>();
 
-                (field_ptr as usize) - (base_ptr as usize)
-            }
-        }
-    };
+            // const since 1.65
+            field_addr.offset_from(base_addr) as usize
+        };
+        OFFSET
+    }};
 }
