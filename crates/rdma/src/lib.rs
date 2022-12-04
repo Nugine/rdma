@@ -44,7 +44,22 @@ pub mod bindings {
 mod error;
 mod weakset;
 
-pub mod device;
+pub mod device {
+    mod device_list;
+    pub use self::device_list::*;
+
+    mod device_attr;
+    pub use self::device_attr::*;
+
+    mod gid;
+    pub use self::gid::*;
+
+    mod port_attr;
+    pub use self::port_attr::*;
+
+    mod guid;
+    pub use self::guid::*;
+}
 
 pub mod ah;
 pub mod cc;
