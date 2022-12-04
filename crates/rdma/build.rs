@@ -43,13 +43,13 @@ fn main() {
         include_paths.sort_unstable();
         include_paths.dedup_by(|x, first| x == first);
         include_paths.push("/usr/include".into());
-        println!("include paths: {:?}", include_paths);
+        println!("include paths: {include_paths:?}");
     }
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     {
-        let include_args = include_paths.iter().map(|p| format!("-I{}", p));
+        let include_args = include_paths.iter().map(|p| format!("-I{p}"));
 
         let bindings = bindgen::Builder::default()
             .clang_args(include_args)

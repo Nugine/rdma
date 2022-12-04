@@ -54,7 +54,6 @@ impl DeviceList {
                 return Err(last_error());
             }
 
-            // SAFETY: repr(transparent)
             let arr: NonNull<Device> = NonNull::new_unchecked(arr.cast());
 
             let _guard = guard_on_unwind((), |()| C::ibv_free_device_list(arr.as_ptr().cast()));

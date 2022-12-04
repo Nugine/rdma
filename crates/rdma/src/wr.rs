@@ -58,7 +58,6 @@ impl SendRequest {
 
     #[inline]
     pub fn next(&mut self, next: *mut Self) -> &mut Self {
-        // SAFETY: repr(transparent)
         self.0.next = next.cast();
         self
     }
@@ -135,7 +134,6 @@ impl RecvRequest {
 
     #[inline]
     pub fn next(&mut self, next: *mut Self) -> &mut Self {
-        // SAFETY: repr(transparent)
         self.0.next = next.cast();
         self
     }

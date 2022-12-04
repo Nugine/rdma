@@ -130,7 +130,6 @@ impl fmt::UpperHex for Gid {
 }
 
 fn gid_to_hex<R>(gid: &Gid, case: hex_simd::AsciiCase, f: impl FnOnce(&str) -> R) -> R {
-    // SAFETY: same repr
     let src: &[u8; 16] = gid.as_bytes();
     let mut buf: MaybeUninit<[u8; 32]> = MaybeUninit::uninit();
     let ans = {

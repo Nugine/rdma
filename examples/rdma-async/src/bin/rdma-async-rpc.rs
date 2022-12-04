@@ -97,7 +97,7 @@ async fn client(addr: SocketAddr) -> Result<()> {
     let mut buf = Buf::new_zeroed(1024, 8);
 
     for i in 1..=64 {
-        let req = Message::Ping(format!("iter {}", i));
+        let req = Message::Ping(format!("iter {i}"));
 
         info!("client send    : {:?}", req);
 

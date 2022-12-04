@@ -334,7 +334,6 @@ unsafe impl Sync for ModifyOptions {}
 impl Default for ModifyOptions {
     #[inline]
     fn default() -> Self {
-        // SAFETY: POD ffi type
         Self {
             mask: 0,
             attr: MaybeUninit::uninit(),
