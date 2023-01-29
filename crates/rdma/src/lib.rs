@@ -23,7 +23,8 @@
     clippy::std_instead_of_alloc,
     clippy::missing_trait_methods,
     clippy::semicolon_outside_block,
-    clippy::semicolon_inside_block
+    clippy::semicolon_inside_block,
+    clippy::multiple_unsafe_ops_per_block
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
