@@ -40,7 +40,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
-      - name: Rust CI
+      - name: Rust CI (nightly)
         run: |
           set -x
           pushd rdma
@@ -55,5 +55,8 @@ jobs:
 
           cargo fmt --all -- --check
           cargo clippy --all-features -- -D warnings
-          cargo +nightly  build --release
-          cargo +stable   build --release
+          cargo build --release
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust CI (stable)
+        run: |
+          cargo build --release
