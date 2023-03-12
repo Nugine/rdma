@@ -185,7 +185,7 @@ impl RdmaConnection {
     where
         T: ScatterList + Send + Sync,
     {
-        let qp: _ = self.qp.clone();
+        let qp = self.qp.clone();
         work::send(qp, slist, imm).await
     }
 
@@ -193,7 +193,7 @@ impl RdmaConnection {
     where
         T: GatherList + Send + Sync,
     {
-        let qp: _ = self.qp.clone();
+        let qp = self.qp.clone();
         work::recv(qp, glist).await
     }
 
@@ -202,7 +202,7 @@ impl RdmaConnection {
         T: ScatterList + Send + Sync,
         U: RemoteWriteAccess + Send + Sync,
     {
-        let qp: _ = self.qp.clone();
+        let qp = self.qp.clone();
         work::write(qp, slist, remote).await
     }
 
@@ -211,7 +211,7 @@ impl RdmaConnection {
         T: GatherList + Send + Sync,
         U: RemoteReadAccess + Send + Sync,
     {
-        let qp: _ = self.qp.clone();
+        let qp = self.qp.clone();
         work::read(qp, glist, remote).await
     }
 }

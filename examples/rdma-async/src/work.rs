@@ -76,7 +76,7 @@ impl<T: Operation> Work<T> {
         let wc = &*wc;
         let inner: Arc<WorkInner<T>> = Arc::from_raw(wc.wr_id() as usize as *mut _);
         {
-            let mut guard: _ = inner.state.lock();
+            let mut guard = inner.state.lock();
             let state = &mut *guard;
             assert_eq!(state.step, Step::Running);
             state.status = wc.status();
@@ -103,7 +103,7 @@ impl<T: Operation> Future for Work<T> {
         match mem::replace(&mut state.step, Step::Poisoned) {
             Step::Pending => {
                 let inner_ptr: *const WorkInner<T> = Arc::into_raw(Arc::clone(&self.inner));
-                let arc_guard: _ =
+                let arc_guard =
                     scopeguard::guard((), |()| unsafe { Arc::decrement_strong_count(inner_ptr) });
 
                 let id: u64 = (inner_ptr as usize).numeric_cast();

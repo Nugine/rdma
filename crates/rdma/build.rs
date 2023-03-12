@@ -4,7 +4,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn link_rdma_core(lib_name: &str, pkg_name: &str, version: &str, include_paths: &mut Vec<String>) {
-    let result: _ = pkg_config::Config::new()
+    let result = pkg_config::Config::new()
         .atleast_version(version)
         .statik(false)
         .probe(lib_name);

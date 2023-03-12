@@ -30,7 +30,7 @@ impl Buf {
             if ptr.is_null() {
                 handle_alloc_error(layout)
             }
-            let guard: _ = guard((), |()| dealloc(ptr, layout));
+            let guard = guard((), |()| dealloc(ptr, layout));
 
             let mr = {
                 let addr = ptr;

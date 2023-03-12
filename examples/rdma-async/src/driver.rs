@@ -62,7 +62,7 @@ impl RdmaDriver {
     }
 
     fn run(self: Arc<Self>) -> Result<()> {
-        let mut wc_buf: _ = [UNINIT_WC; DEFAULT_CQ_CAPACITY];
+        let mut wc_buf = [UNINIT_WC; DEFAULT_CQ_CAPACITY];
 
         loop {
             self.cc.wait_cq_event()?;

@@ -87,7 +87,7 @@ pub unsafe fn ibv_create_cq_ex(
         set_errno(EOPNOTSUPP);
         return ptr::null_mut();
     }
-    let op: _ = (*vctx).create_cq_ex.unwrap_unchecked();
+    let op = (*vctx).create_cq_ex.unwrap_unchecked();
     (op)(context, cq_attr)
 }
 
@@ -179,33 +179,33 @@ pub unsafe fn ibv_create_qp_ex(
 #[inline]
 pub unsafe fn ibv_req_notify_cq(cq: *mut ibv_cq, solicited_only: c_int) -> c_int {
     let ctx: *mut ibv_context = (*cq).context;
-    let op: _ = (*ctx).ops.req_notify_cq.unwrap_unchecked();
+    let op = (*ctx).ops.req_notify_cq.unwrap_unchecked();
     (op)(cq, solicited_only)
 }
 
 #[inline]
 pub unsafe fn ibv_poll_cq(cq: *mut ibv_cq, num_entries: c_int, wc: *mut ibv_wc) -> c_int {
     let ctx: *mut ibv_context = (*cq).context;
-    let op: _ = (*ctx).ops.poll_cq.unwrap_unchecked();
+    let op = (*ctx).ops.poll_cq.unwrap_unchecked();
     (op)(cq, num_entries, wc)
 }
 
 #[inline]
 pub unsafe fn ibv_alloc_mw(pd: *mut ibv_pd, mw_type: ibv_mw_type) -> *mut ibv_mw {
     let ctx: *mut ibv_context = (*pd).context;
-    let op: _ = (*ctx).ops.alloc_mw;
+    let op = (*ctx).ops.alloc_mw;
     if op.is_none() {
         set_errno(EOPNOTSUPP);
         return ptr::null_mut();
     }
-    let op: _ = op.unwrap_unchecked();
+    let op = op.unwrap_unchecked();
     (op)(pd, mw_type)
 }
 
 #[inline]
 pub unsafe fn ibv_dealloc_mw(mw: *mut ibv_mw) -> c_int {
     let ctx: *mut ibv_context = (*mw).context;
-    let op: _ = (*ctx).ops.dealloc_mw.unwrap_unchecked();
+    let op = (*ctx).ops.dealloc_mw.unwrap_unchecked();
     (op)(mw)
 }
 
@@ -228,7 +228,7 @@ pub unsafe fn ibv_bind_mw(qp: *mut ibv_qp, mw: *mut ibv_mw, mw_bind: *mut ibv_mw
 
     {
         let ctx: *mut ibv_context = (*mw).context;
-        let op: _ = (*ctx).ops.bind_mw.unwrap_unchecked();
+        let op = (*ctx).ops.bind_mw.unwrap_unchecked();
         (op)(qp, mw, mw_bind)
     }
 }
@@ -242,7 +242,7 @@ pub unsafe fn ibv_alloc_dm(context: *mut ibv_context, attr: *mut ibv_alloc_dm_at
         return ptr::null_mut();
     }
 
-    let op: _ = (*vctx).alloc_dm.unwrap_unchecked();
+    let op = (*vctx).alloc_dm.unwrap_unchecked();
     (op)(context, attr)
 }
 
@@ -254,7 +254,7 @@ pub unsafe fn ibv_free_dm(dm: *mut ibv_dm) -> c_int {
         return EOPNOTSUPP;
     }
 
-    let op: _ = (*vctx).free_dm.unwrap_unchecked();
+    let op = (*vctx).free_dm.unwrap_unchecked();
     (op)(dm)
 }
 
@@ -265,7 +265,7 @@ pub unsafe fn ibv_post_send(
     bad_wr: *mut *mut ibv_send_wr,
 ) -> c_int {
     let ctx: *mut ibv_context = (*qp).context;
-    let op: _ = (*ctx).ops.post_send.unwrap_unchecked();
+    let op = (*ctx).ops.post_send.unwrap_unchecked();
     (op)(qp, wr, bad_wr)
 }
 
@@ -276,7 +276,7 @@ pub unsafe fn ibv_post_recv(
     bad_wr: *mut *mut ibv_recv_wr,
 ) -> c_int {
     let ctx: *mut ibv_context = (*qp).context;
-    let op: _ = (*ctx).ops.post_recv.unwrap_unchecked();
+    let op = (*ctx).ops.post_recv.unwrap_unchecked();
     (op)(qp, wr, bad_wr)
 }
 
@@ -301,13 +301,13 @@ pub unsafe fn ibv_wr_atomic_cmp_swp(
     compare: u64,
     swap: u64,
 ) {
-    let op: _ = (*qp).wr_atomic_cmp_swp.unwrap_unchecked();
+    let op = (*qp).wr_atomic_cmp_swp.unwrap_unchecked();
     (op)(qp, rkey, remote_addr, compare, swap);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_atomic_fetch_add(qp: *mut ibv_qp_ex, rkey: u32, remote_addr: u64, add: u64) {
-    let op: _ = (*qp).wr_atomic_fetch_add.unwrap_unchecked();
+    let op = (*qp).wr_atomic_fetch_add.unwrap_unchecked();
     (op)(qp, rkey, remote_addr, add);
 }
 
@@ -318,25 +318,25 @@ pub unsafe fn ibv_wr_bind_mw(
     rkey: u32,
     bind_info: *const ibv_mw_bind_info,
 ) {
-    let op: _ = (*qp).wr_bind_mw.unwrap_unchecked();
+    let op = (*qp).wr_bind_mw.unwrap_unchecked();
     (op)(qp, mw, rkey, bind_info);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_local_inv(qp: *mut ibv_qp_ex, invalidate_rkey: u32) {
-    let op: _ = (*qp).wr_local_inv.unwrap_unchecked();
+    let op = (*qp).wr_local_inv.unwrap_unchecked();
     (op)(qp, invalidate_rkey);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_rdma_read(qp: *mut ibv_qp_ex, rkey: u32, remote_addr: u64) {
-    let op: _ = (*qp).wr_rdma_read.unwrap_unchecked();
+    let op = (*qp).wr_rdma_read.unwrap_unchecked();
     (op)(qp, rkey, remote_addr);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_rdma_write(qp: *mut ibv_qp_ex, rkey: u32, remote_addr: u64) {
-    let op: _ = (*qp).wr_rdma_write.unwrap_unchecked();
+    let op = (*qp).wr_rdma_write.unwrap_unchecked();
     (op)(qp, rkey, remote_addr);
 }
 
@@ -347,31 +347,31 @@ pub unsafe fn ibv_wr_rdma_write_imm(
     remote_addr: u64,
     imm_data: __be32,
 ) {
-    let op: _ = (*qp).wr_rdma_write_imm.unwrap_unchecked();
+    let op = (*qp).wr_rdma_write_imm.unwrap_unchecked();
     (op)(qp, rkey, remote_addr, imm_data);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send(qp: *mut ibv_qp_ex) {
-    let op: _ = (*qp).wr_send.unwrap_unchecked();
+    let op = (*qp).wr_send.unwrap_unchecked();
     (op)(qp);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send_imm(qp: *mut ibv_qp_ex, imm_data: __be32) {
-    let op: _ = (*qp).wr_send_imm.unwrap_unchecked();
+    let op = (*qp).wr_send_imm.unwrap_unchecked();
     (op)(qp, imm_data);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send_inv(qp: *mut ibv_qp_ex, invalidate_rkey: u32) {
-    let op: _ = (*qp).wr_send_inv.unwrap_unchecked();
+    let op = (*qp).wr_send_inv.unwrap_unchecked();
     (op)(qp, invalidate_rkey);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_send_tso(qp: *mut ibv_qp_ex, hdr: *mut c_void, hdr_sz: u16, mss: u16) {
-    let op: _ = (*qp).wr_send_tso.unwrap_unchecked();
+    let op = (*qp).wr_send_tso.unwrap_unchecked();
     (op)(qp, hdr, hdr_sz, mss);
 }
 
@@ -382,19 +382,19 @@ pub unsafe fn ibv_wr_set_ud_addr(
     remote_qpn: u32,
     remote_qkey: u32,
 ) {
-    let op: _ = (*qp).wr_set_ud_addr.unwrap_unchecked();
+    let op = (*qp).wr_set_ud_addr.unwrap_unchecked();
     (op)(qp, ah, remote_qpn, remote_qkey);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_xrc_srqn(qp: *mut ibv_qp_ex, remote_srqn: u32) {
-    let op: _ = (*qp).wr_set_xrc_srqn.unwrap_unchecked();
+    let op = (*qp).wr_set_xrc_srqn.unwrap_unchecked();
     (op)(qp, remote_srqn);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_inline_data(qp: *mut ibv_qp_ex, addr: *mut c_void, length: usize) {
-    let op: _ = (*qp).wr_set_inline_data.unwrap_unchecked();
+    let op = (*qp).wr_set_inline_data.unwrap_unchecked();
     (op)(qp, addr, length);
 }
 
@@ -404,37 +404,37 @@ pub unsafe fn ibv_wr_set_inline_data_list(
     num_buf: usize,
     buf_list: *const ibv_data_buf,
 ) {
-    let op: _ = (*qp).wr_set_inline_data_list.unwrap_unchecked();
+    let op = (*qp).wr_set_inline_data_list.unwrap_unchecked();
     (op)(qp, num_buf, buf_list);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_sge(qp: *mut ibv_qp_ex, lkey: u32, addr: u64, length: u32) {
-    let op: _ = (*qp).wr_set_sge.unwrap_unchecked();
+    let op = (*qp).wr_set_sge.unwrap_unchecked();
     (op)(qp, lkey, addr, length);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_set_sge_list(qp: *mut ibv_qp_ex, num_sge: usize, sg_list: *const ibv_sge) {
-    let op: _ = (*qp).wr_set_sge_list.unwrap_unchecked();
+    let op = (*qp).wr_set_sge_list.unwrap_unchecked();
     (op)(qp, num_sge, sg_list);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_start(qp: *mut ibv_qp_ex) {
-    let op: _ = (*qp).wr_start.unwrap_unchecked();
+    let op = (*qp).wr_start.unwrap_unchecked();
     (op)(qp);
 }
 
 #[inline]
 pub unsafe fn ibv_wr_complete(qp: *mut ibv_qp_ex) -> c_int {
-    let op: _ = (*qp).wr_complete.unwrap_unchecked();
+    let op = (*qp).wr_complete.unwrap_unchecked();
     (op)(qp)
 }
 
 #[inline]
 pub unsafe fn ibv_wr_abort(qp: *mut ibv_qp_ex) {
-    let op: _ = (*qp).wr_abort.unwrap_unchecked();
+    let op = (*qp).wr_abort.unwrap_unchecked();
     (op)(qp);
 }
 
@@ -465,6 +465,6 @@ pub unsafe fn ibv_create_srq_ex(
         return ptr::null_mut();
     }
 
-    let op: _ = (*vctx).create_srq_ex.unwrap_unchecked();
+    let op = (*vctx).create_srq_ex.unwrap_unchecked();
     (op)(context, srq_init_attr_ex)
 }
