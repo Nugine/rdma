@@ -5,7 +5,6 @@ use crate::utils::{c_uint_to_u32, ptr_as_mut, u32_as_c_uint};
 use std::mem;
 use std::os::raw::{c_int, c_uint};
 
-use bitflags::bitflags;
 use numeric_cast::NumericCast;
 
 #[repr(transparent)]
@@ -164,19 +163,27 @@ impl Opcode {
     }
 }
 
-bitflags! {
-    pub struct SendFlags: u32 {
-        const FENCE = c_uint_to_u32(C::IBV_SEND_FENCE);
-        const SIGNALED = c_uint_to_u32(C::IBV_SEND_SIGNALED);
-        const SOLICITED = c_uint_to_u32(C::IBV_SEND_SOLICITED);
-        const INLINE = c_uint_to_u32(C::IBV_SEND_INLINE);
-        const IP_CSUM = c_uint_to_u32(C::IBV_SEND_IP_CSUM);
+#[allow(clippy::same_name_method)]
+mod flags {
+    use super::*;
+
+    bitflags::bitflags! {
+        pub struct SendFlags: u32 {
+            const FENCE = c_uint_to_u32(C::IBV_SEND_FENCE);
+            const SIGNALED = c_uint_to_u32(C::IBV_SEND_SIGNALED);
+            const SOLICITED = c_uint_to_u32(C::IBV_SEND_SOLICITED);
+            const INLINE = c_uint_to_u32(C::IBV_SEND_INLINE);
+            const IP_CSUM = c_uint_to_u32(C::IBV_SEND_IP_CSUM);
+        }
     }
 }
+pub use self::flags::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use rust_utils::offset_of;
 
     #[test]
     fn sge_layout() {

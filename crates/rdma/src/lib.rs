@@ -40,6 +40,8 @@ mod utils;
 pub mod bindings {
     use libc::*;
 
+    use rust_utils::offset_of;
+
     mod generated;
     pub use self::generated::*;
 

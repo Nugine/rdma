@@ -134,6 +134,8 @@ impl GlobalRoute {
 mod tests {
     use super::*;
 
+    use rust_utils::offset_of;
+
     #[test]
     fn global_route_layout() {
         assert_eq!(

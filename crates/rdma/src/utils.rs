@@ -1,30 +1,10 @@
 #![allow(clippy::as_conversions)]
 
-use std::alloc::{alloc, handle_alloc_error, Layout};
-use std::mem::{self, MaybeUninit};
+use std::mem;
 use std::os::raw::{c_int, c_uint, c_void};
 
 #[cfg(test)]
 pub fn require_send_sync<T: Send + Sync>() {}
-
-/// See <https://github.com/rust-lang/rust/issues/63291>
-pub fn box_new_uninit<T>() -> Box<MaybeUninit<T>> {
-    let layout = Layout::new::<T>();
-    // SAFETY: alloc
-    unsafe {
-        let ptr = alloc(layout);
-        if ptr.is_null() {
-            handle_alloc_error(layout)
-        }
-        Box::from_raw(ptr.cast())
-    }
-}
-
-/// See <https://github.com/rust-lang/rust/issues/63291>
-pub unsafe fn box_assume_init<T>(b: Box<MaybeUninit<T>>) -> Box<T> {
-    let ptr = Box::into_raw(b).cast::<T>();
-    Box::from_raw(ptr)
-}
 
 #[allow(clippy::unnecessary_cast)]
 pub const fn c_uint_to_u32(x: c_uint) -> u32 {
@@ -58,44 +38,4 @@ pub fn void_ptr_to_usize(p: *mut c_void) -> usize {
 
 pub fn u32_as_c_uint(val: u32) -> c_uint {
     val as c_uint
-}
-
-/// Calculates the offset of the specified field from the start of the named struct.
-#[macro_export]
-macro_rules! offset_of {
-    ($ty: path, $field: tt) => {{
-        use ::core::mem::MaybeUninit;
-        use ::core::primitive::{u8, usize};
-        use ::core::ptr;
-
-        #[allow(
-            unused_unsafe,
-            clippy::as_conversions,
-            clippy::unneeded_field_pattern,
-            clippy::undocumented_unsafe_blocks
-        )]
-        const OFFSET: usize = unsafe {
-            // ensure the type is a named struct
-            // ensure the field exists and is accessible
-            let $ty { $field: _, .. };
-
-            // const since 1.36
-            let uninit: MaybeUninit<$ty> = MaybeUninit::uninit();
-
-            // const since 1.59
-            // UnsafeCell needs feature(const_refs_to_cell)
-            let base_ptr: *const $ty = uninit.as_ptr();
-
-            // stable since 1.51
-            let field_ptr: *const _ = ptr::addr_of!((*base_ptr).$field);
-
-            // const since 1.38
-            let base_addr = base_ptr.cast::<u8>();
-            let field_addr = field_ptr.cast::<u8>();
-
-            // const since 1.65
-            field_addr.offset_from(base_addr) as usize
-        };
-        OFFSET
-    }};
 }

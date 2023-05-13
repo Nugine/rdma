@@ -1,12 +1,13 @@
 use crate::bindings as C;
 use crate::ctx::Context;
 use crate::error::from_errno;
-use crate::utils::{box_assume_init, box_new_uninit, c_uint_to_u32, u32_as_c_uint};
+use crate::utils::{c_uint_to_u32, u32_as_c_uint};
 
 use std::os::raw::c_uint;
 use std::{io, mem};
 
 use numeric_cast::NumericCast;
+use rust_utils::{box_assume_init, box_new_zeroed};
 
 pub struct PortAttr(Box<C::ibv_port_attr>);
 
@@ -15,7 +16,8 @@ impl PortAttr {
     pub fn query(ctx: &Context, port_num: u8) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let mut port_attr = box_new_uninit::<C::ibv_port_attr>();
+            let mut port_attr = box_new_zeroed::<C::ibv_port_attr>();
+
             let context = ctx.ffi_ptr();
             let ret = C::ibv_query_port(context, port_num, port_attr.as_mut_ptr());
             if ret != 0 {

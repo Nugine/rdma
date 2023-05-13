@@ -481,6 +481,8 @@ impl QueuePairState {
 mod tests {
     use super::*;
 
+    use rust_utils::offset_of;
+
     #[test]
     fn qp_cap_layout() {
         assert_eq!(
