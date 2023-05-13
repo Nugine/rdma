@@ -71,7 +71,6 @@ fn main() {
             .prepend_enum_name(false)
             .default_enum_style("consts".parse().unwrap())
             .size_t_is_usize(true)
-            .rustfmt_bindings(true)
             .rust_target("1.47".parse().unwrap());
 
         {

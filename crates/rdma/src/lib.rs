@@ -31,7 +31,8 @@
 #![allow(
     clippy::missing_errors_doc, // TODO
     clippy::missing_docs_in_private_items, // TODO
-    clippy::missing_assert_message
+    clippy::missing_assert_message,
+    clippy::multiple_crate_versions, // needs upstream fix
 )]
 
 #[macro_use]

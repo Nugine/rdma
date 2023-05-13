@@ -1,14 +1,13 @@
 use crate::bindings as C;
 use crate::error::create_resource;
 use crate::pd::ProtectionDomain;
-use crate::utils::{c_uint_to_u32, ptr_to_addr, u32_as_c_uint};
+use crate::utils::ptr_to_addr;
 
 use std::io;
-use std::os::raw::{c_uint, c_void};
+use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-use bitflags::bitflags;
 use numeric_cast::NumericCast;
 
 #[derive(Clone)]
@@ -130,22 +129,34 @@ impl<T> Drop for Owner<T> {
     }
 }
 
-bitflags! {
-    pub struct AccessFlags: u32 {
-        const LOCAL_WRITE       = c_uint_to_u32(C::IBV_ACCESS_LOCAL_WRITE);
-        const REMOTE_WRITE      = c_uint_to_u32(C::IBV_ACCESS_REMOTE_WRITE);
-        const REMOTE_READ       = c_uint_to_u32(C::IBV_ACCESS_REMOTE_READ);
-        const REMOTE_ATOMIC     = c_uint_to_u32(C::IBV_ACCESS_REMOTE_ATOMIC);
-        const MW_BIND           = c_uint_to_u32(C::IBV_ACCESS_MW_BIND);
-        const ZERO_BASED        = c_uint_to_u32(C::IBV_ACCESS_ZERO_BASED);
-        const ON_DEMAND         = c_uint_to_u32(C::IBV_ACCESS_ON_DEMAND);
-        const HUGETLB           = c_uint_to_u32(C::IBV_ACCESS_HUGETLB);
-        const RELAXED_ORDERING  = c_uint_to_u32(C::IBV_ACCESS_RELAXED_ORDERING);
-    }
-}
+#[allow(clippy::same_name_method)]
+mod flags {
+    use super::C;
 
-impl AccessFlags {
-    pub(crate) fn to_c_uint(self) -> c_uint {
-        u32_as_c_uint(self.bits())
+    use crate::utils::c_uint_to_u32;
+    use crate::utils::u32_as_c_uint;
+
+    use std::os::raw::c_uint;
+
+    bitflags::bitflags! {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub struct AccessFlags: u32 {
+            const LOCAL_WRITE       = c_uint_to_u32(C::IBV_ACCESS_LOCAL_WRITE);
+            const REMOTE_WRITE      = c_uint_to_u32(C::IBV_ACCESS_REMOTE_WRITE);
+            const REMOTE_READ       = c_uint_to_u32(C::IBV_ACCESS_REMOTE_READ);
+            const REMOTE_ATOMIC     = c_uint_to_u32(C::IBV_ACCESS_REMOTE_ATOMIC);
+            const MW_BIND           = c_uint_to_u32(C::IBV_ACCESS_MW_BIND);
+            const ZERO_BASED        = c_uint_to_u32(C::IBV_ACCESS_ZERO_BASED);
+            const ON_DEMAND         = c_uint_to_u32(C::IBV_ACCESS_ON_DEMAND);
+            const HUGETLB           = c_uint_to_u32(C::IBV_ACCESS_HUGETLB);
+            const RELAXED_ORDERING  = c_uint_to_u32(C::IBV_ACCESS_RELAXED_ORDERING);
+        }
+    }
+
+    impl AccessFlags {
+        pub(crate) fn to_c_uint(self) -> c_uint {
+            u32_as_c_uint(self.bits())
+        }
     }
 }
+pub use self::flags::*;

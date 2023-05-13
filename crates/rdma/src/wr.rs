@@ -168,6 +168,7 @@ mod flags {
     use super::*;
 
     bitflags::bitflags! {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         pub struct SendFlags: u32 {
             const FENCE = c_uint_to_u32(C::IBV_SEND_FENCE);
             const SIGNALED = c_uint_to_u32(C::IBV_SEND_SIGNALED);
