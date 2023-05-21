@@ -4,7 +4,7 @@
     clippy::as_conversions,
     clippy::unneeded_field_pattern,
     clippy::undocumented_unsafe_blocks,
-    clippy::integer_arithmetic,
+    clippy::arithmetic_side_effects,
     clippy::inline_always,
     clippy::shadow_same,
     clippy::missing_safety_doc,
