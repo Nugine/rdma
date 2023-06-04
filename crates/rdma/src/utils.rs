@@ -25,7 +25,7 @@ pub fn ptr_from_addr<T>(val: usize) -> *const T {
 }
 
 pub fn ptr_as_mut<T>(p: *const T) -> *mut T {
-    p as *mut T
+    p.cast_mut()
 }
 
 pub fn usize_to_void_ptr(val: usize) -> *mut c_void {
