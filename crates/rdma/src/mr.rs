@@ -24,6 +24,7 @@ impl<T> MemoryRegion<T> {
     /// # Safety
     /// 1. the memory region must be valid until it is deregistered
     /// 2. the memory region must be initialized before it is read for the first time
+    #[allow(clippy::arc_with_non_send_sync)] // FIXME: false positive
     #[inline]
     pub unsafe fn register(
         pd: &ProtectionDomain,

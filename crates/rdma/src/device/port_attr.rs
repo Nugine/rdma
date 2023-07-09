@@ -7,7 +7,7 @@ use std::os::raw::c_uint;
 use std::{io, mem};
 
 use numeric_cast::NumericCast;
-use rust_utils::{box_assume_init, box_new_zeroed};
+use rust_utils::boxed::BoxExt;
 
 pub struct PortAttr(Box<C::ibv_port_attr>);
 
@@ -16,14 +16,14 @@ impl PortAttr {
     pub fn query(ctx: &Context, port_num: u8) -> io::Result<Self> {
         // SAFETY: ffi
         unsafe {
-            let mut port_attr = box_new_zeroed::<C::ibv_port_attr>();
+            let mut port_attr = <Box<C::ibv_port_attr>>::new_zeroed_();
 
             let context = ctx.ffi_ptr();
             let ret = C::ibv_query_port(context, port_num, port_attr.as_mut_ptr());
             if ret != 0 {
                 return Err(from_errno(ret));
             }
-            Ok(Self(box_assume_init(port_attr)))
+            Ok(Self(Box::assume_init_(port_attr)))
         }
     }
 
