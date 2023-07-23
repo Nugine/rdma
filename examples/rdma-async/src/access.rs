@@ -139,6 +139,7 @@ pub fn as_slice<T: LocalReadAccess>(ra: &T) -> &[u8] {
     unsafe { slice::from_raw_parts(data, len) }
 }
 
+#[allow(clippy::needless_pass_by_ref_mut)] // false positive
 pub fn as_mut_slice<T: LocalWriteAccess>(wa: &mut T) -> &mut [MaybeUninit<u8>] {
     let data = wa.addr_u64() as usize as *mut MaybeUninit<u8>;
     let len = wa.length();
