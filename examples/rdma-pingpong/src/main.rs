@@ -341,7 +341,7 @@ fn run(args: Args) -> Result<()> {
 fn choose_device<'dl>(dev_list: &'dl DeviceList, name: Option<&str>) -> Result<&'dl Device> {
     let dev = match name {
         Some(name) => dev_list.iter().find(|d| d.name() == name),
-        None => dev_list.get(0),
+        None => dev_list.first(),
     };
     if let Some(dev) = dev {
         return Ok(dev);

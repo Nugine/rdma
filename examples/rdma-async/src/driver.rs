@@ -35,7 +35,7 @@ impl RdmaDriver {
     fn init_default() -> Arc<RdmaDriver> {
         let ctx = {
             let dev_list = DeviceList::available().expect("Failed to get rdma devices");
-            let dev = dev_list.get(0).expect("No available rdma device");
+            let dev = dev_list.first().expect("No available rdma device");
             Context::open(dev).expect("Failed to open rdma device")
         };
 
