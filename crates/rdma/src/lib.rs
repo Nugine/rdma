@@ -27,7 +27,8 @@
     clippy::multiple_unsafe_ops_per_block,
     clippy::question_mark_used,
     clippy::impl_trait_in_params,
-    clippy::ref_patterns
+    clippy::ref_patterns,
+    clippy::struct_field_names
 )]
 #![allow(
     clippy::missing_errors_doc, // TODO
